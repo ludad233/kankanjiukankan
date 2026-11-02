@@ -2,19 +2,15 @@ name: 自动抓取电力数据
 
 on:
   schedule:
-    # 北京时间 23:05 抓取（对应 UTC 15:05）
-    - cron: '5 15 * * *'
-    # 北京时间 23:55 抓取最后一次结算数据（对应 UTC 15:55）
-    - cron: '55 15 * * *'
-    # 除了深夜的 23:05 和 23:55，其余时间每小时的 05 分抓取（对应 UTC 00:05 - 14:05 和 16:05 - 22:05）
-    - cron: '5 0-14,16-22 * * *'
+    # 每小时的第 59 分钟触发（对应北京时间每小时的 59 分）
+    - cron: '59 * * * *'
   workflow_dispatch:  # 保留手动点击运行按钮
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 允许工作流提交更改回仓库
+      contents: write
 
     steps:
       - name: 拉取代码
@@ -40,18 +36,7 @@ jobs:
         run: python scrape.py
 
       - name: 提交更新后的数据
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          
-          # 将所有产生变化的文件添加到暂存区
-          git add .
-          
-          # 如果有变化则提交，如果没有变化就跳过
-          git diff --quiet && git diff --staged --quiet || git commit -m "自动更新数据 $(date -u '+%Y-%m-%d %H:%M')"
-          
-          # 先拉取远端仓库最新的代码并合并，防止冲突
-          git pull origin main --rebase
-          
-          # 最后推送
-          git push
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "自动更新数据"
+          file_pattern: "power_data.csv comparison_chart.png"
