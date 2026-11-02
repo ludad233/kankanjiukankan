@@ -2,6 +2,7 @@ import asyncio
 import csv
 import os
 import re
+import shutil
 from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
 
@@ -21,6 +22,8 @@ URL_POWER = "https://y.qq.com/tmead/promotion/h5/powering/1793152992875?_hidehd=
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, "power_data.csv")
 CHART_FILE = os.path.join(BASE_DIR, "comparison_chart.png")
+HISTORY_DIR = os.path.join(BASE_DIR, "history")
+os.makedirs(HISTORY_DIR, exist_ok=True)
 
 
 # ============ 抓取与存储 ============
@@ -32,36 +35,68 @@ def parse_num(text):
 
 async def scrape_team(page, url):
     if not url: return {"今日心动人数": None, "团建电力值": None}
-    await page.goto(url, wait_until="networkidle", timeout=90000)
-    await page.wait_for_timeout(5000)
+
     result = {"今日心动人数": None, "团建电力值": None}
-    try:
-        heart_ele = page.locator("text=本团今日心动").first
-        parent_text = await heart_ele.evaluate("el => el.parentElement.innerText")
-        result["今日心动人数"] = parse_num(parent_text)
-    except:
-        pass
-    try:
-        body_text = await page.locator("body").inner_text()
-        matches = re.findall(r"(\d{1,3}(?:,\d{3})+)\s*/\s*(\d{1,3}(?:,\d{3})+)", body_text)
-        if matches:
-            best = max(matches, key=lambda x: int(x[0].replace(",", "")))
-            result["团建电力值"] = int(best[0].replace(",", ""))
-    except:
-        pass
+
+    # 增加重试机制，最多试 2 次
+    for attempt in range(2):
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=90000)
+            # 增加等待时间到 8 秒，给活动页面的动态数据充分的渲染时间
+            await page.wait_for_timeout(8000)
+
+            # 尝试抓取心动人数
+            try:
+                heart_ele = page.locator("text=本团今日心动").first
+                parent_text = await heart_ele.evaluate("el => el.parentElement.innerText")
+                result["今日心动人数"] = parse_num(parent_text)
+            except:
+                pass
+
+            # 尝试抓取团建电力
+            try:
+                body_text = await page.locator("body").inner_text()
+                matches = re.findall(r"(\d{1,3}(?:,\d{3})+)\s*/\s*(\d{1,3}(?:,\d{3})+)", body_text)
+                if matches:
+                    best = max(matches, key=lambda x: int(x[0].replace(",", "")))
+                    result["团建电力值"] = int(best[0].replace(",", ""))
+            except:
+                pass
+
+            # 如果至少抓到了其中一个数据，说明加载成功了，跳出重试
+            if result["今日心动人数"] is not None or result["团建电力值"] is not None:
+                break
+            else:
+                print(f"⚠️ 第 {attempt + 1} 次抓取为空，准备重试...")
+                await page.wait_for_timeout(2000)
+        except Exception as e:
+            print(f"⚠️ 第 {attempt + 1} 次抓取异常: {e}")
+
     return result
 
 
 async def scrape_power(page):
-    await page.goto(URL_POWER, wait_until="networkidle", timeout=90000)
-    await page.wait_for_timeout(5000)
     result = {"总电力值": None}
-    try:
-        body_text = await page.locator("body").inner_text()
-        nums = re.findall(r"\d{1,3}(?:,\d{3})+", body_text)
-        if nums: result["总电力值"] = max(int(n.replace(",", "")) for n in nums)
-    except:
-        pass
+
+    for attempt in range(2):
+        try:
+            await page.goto(URL_POWER, wait_until="networkidle", timeout=90000)
+            await page.wait_for_timeout(8000)
+            try:
+                body_text = await page.locator("body").inner_text()
+                nums = re.findall(r"\d{1,3}(?:,\d{3})+", body_text)
+                if nums:
+                    result["总电力值"] = max(int(n.replace(",", "")) for n in nums)
+            except:
+                pass
+
+            if result["总电力值"] is not None:
+                break
+            else:
+                print(f"⚠️ 总电力第 {attempt + 1} 次抓取为空，准备重试...")
+        except Exception as e:
+            print(f"⚠️ 总电力第 {attempt + 1} 次抓取异常: {e}")
+
     return result
 
 
@@ -93,7 +128,6 @@ def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
-    # 因为我们在 append_csv 里已经把时间变成了整点，这里直接找上一个小时即可
     curr_hour_str = fmt_no_pad(curr_dt)
     prev_hour_str = fmt_no_pad(curr_dt - timedelta(hours=1))
 
@@ -109,13 +143,10 @@ def append_csv(row_dict):
     header, all_rows = load_all_rows()
     curr_dt = datetime.strptime(row_dict["时间"], "%Y-%m-%d %H:%M:%S")
 
-    # 【核心修改点】：如果在 59 分运行，向后进位变成下个整点
     if curr_dt.minute >= 50:
         curr_dt = curr_dt + timedelta(minutes=(60 - curr_dt.minute))
 
     formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} {curr_dt.hour:02d}:{curr_dt.minute:02d}"
-
-    # 为了计算增幅，我们需要找上一小时的数据
     prev_row = get_prev_hour_record(curr_dt, all_rows)
 
     def calc_delta(curr_val, col_idx):
@@ -177,7 +208,6 @@ def generate_chart(target_date, save_path, is_final=False):
                "heart": to_float(r[1]), "heart_delta": to_float(r[2]),
                "team1": to_float(r[3]), "delta": to_float(r[4])}
 
-        # 因为我们现在全都是整点数据了，直接存
         if dt.hour == 0:
             data_map[f"{target_date_str}_0"] = rec
             continue
@@ -215,7 +245,6 @@ def generate_chart(target_date, save_path, is_final=False):
         if h == 0:
             rec = data_map.get(f"{today_str}_0")
         elif h == 24:
-            # 24点用下一天的0点
             rec = data_map.get(f"{next_str}_0")
         else:
             rec = data_map.get(f"{today_str}_{h}")
@@ -427,26 +456,32 @@ async def run_once():
         await browser.close()
 
     if data["今日心动人数1"] is None and data["团建电力值1"] is None and data["总电力值"] is None:
-        print("❌ 抓取失败：所有数据均为空，可能是网页加载超时或网络问题。")
+        print("❌ 抓取失败：所有数据均为空，网页加载超时或网络被拦截。")
         print(f"当前抓取时间: {data['时间']}")
         return
 
     append_csv(data)
 
     try:
-        # 如果是在 59 分跑，这里会进位到下一天的 0 点，所以用进位后的日期来画图
         chart_date = curr_dt
         if chart_date.minute >= 50:
             chart_date = chart_date + timedelta(minutes=(60 - chart_date.minute))
 
         today_date = chart_date.date()
         generate_chart(today_date, CHART_FILE)
+
+        if curr_dt.hour == 23 and curr_dt.minute >= 50:
+            archive_name = f"{today_date}.png"
+            archive_path = os.path.join(HISTORY_DIR, archive_name)
+            shutil.copy(CHART_FILE, archive_path)
+            print(f"📁 已生成每日归档图片：{archive_path}")
+
     except Exception as e:
         print(f"生成图表失败: {e}")
 
 
 async def main():
-    print("定时任务已启动 (GitHub Actions 单次模式)...")
+    print("定时任务已启动...")
     try:
         await run_once()
     except Exception as e:
