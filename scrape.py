@@ -417,8 +417,6 @@ def generate_chart(target_date, save_path, is_final=False):
 
 # ============ 主流程 ============
 async def run_once():
-    # 【修改 1】获取北京时间 (UTC + 8小时)
-    # GitHub Actions 服务器运行在 UTC 时间，如果不加 8 小时，存入 CSV 的时间会全部错乱
     now_bj = datetime.now() + timedelta(hours=8)
 
     async with async_playwright() as p:
@@ -436,6 +434,12 @@ async def run_once():
         pwr = await scrape_power(page)
         data["总电力值"] = pwr["总电力值"]
         await browser.close()
+
+    # ============ 新增防呆判断 ============
+    if data["今日心动人数1"] is None and data["团建电力值1"] is None and data["总电力值"] is None:
+        print("❌ 抓取失败：所有数据均为空，可能是网页加载超时或网络问题。")
+        print(f"当前抓取时间: {data['时间']}")
+        return  # 直接结束，不写入 CSV，也不生成空图表
 
     append_csv(data)
     try:
@@ -460,7 +464,6 @@ async def main():
         await run_once()
     except Exception as e:
         print(f"[抓取失败]: {e}")
-    # 【修改 2】去掉了 while True 和 asyncio.sleep，执行完一次直接退出
 
 
 if __name__ == "__main__":
