@@ -79,7 +79,8 @@ async def scrape_power(page):
 
     for attempt in range(2):
         try:
-            await page.goto(URL_POWER, wait_until="networkidle", timeout=90000)
+            # 尝试使用 load 代替 networkidle，避免由于持续请求导致的超时
+            await page.goto(URL_POWER, wait_until="load", timeout=90000)
             await page.wait_for_timeout(8000)
             try:
                 body_text = await page.locator("body").inner_text()
@@ -233,6 +234,7 @@ def generate_chart(target_date, save_path, is_final=False):
 
     plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei", "Microsoft YaHei", "SimHei", "Arial Unicode MS",
                                        "DejaVu Sans"]
+    plt.rcParams["font.weight"] = "normal"  # 添加这一行消除 findfont 警告
     plt.rcParams["axes.unicode_minus"] = False
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
@@ -439,7 +441,11 @@ async def run_once():
     now_bj = datetime.now() + timedelta(hours=8)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        # 强制使用 HTTP/1.1，绕过 HTTP/2 协议错误
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--disable-http2"]
+        )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
         page = await context.new_page()
