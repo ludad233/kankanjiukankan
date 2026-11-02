@@ -6,11 +6,9 @@ from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
 
 import matplotlib
-
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 # ============ 配置 ============
@@ -22,13 +20,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, "power_data.csv")
 CHART_FILE = os.path.join(BASE_DIR, "comparison_chart.png")
 
-
 # ============ 抓取与存储 ============
 def parse_num(text):
     if not text: return None
     m = re.search(r"[\d,]+", str(text))
     return int(m.group(0).replace(",", "")) if m else None
-
 
 async def scrape_team(page, url):
     if not url: return {"今日心动人数": None, "团建电力值": None}
@@ -39,18 +35,15 @@ async def scrape_team(page, url):
         heart_ele = page.locator("text=本团今日心动").first
         parent_text = await heart_ele.evaluate("el => el.parentElement.innerText")
         result["今日心动人数"] = parse_num(parent_text)
-    except:
-        pass
+    except: pass
     try:
         body_text = await page.locator("body").inner_text()
         matches = re.findall(r"(\d{1,3}(?:,\d{3})+)\s*/\s*(\d{1,3}(?:,\d{3})+)", body_text)
         if matches:
             best = max(matches, key=lambda x: int(x[0].replace(",", "")))
             result["团建电力值"] = int(best[0].replace(",", ""))
-    except:
-        pass
+    except: pass
     return result
-
 
 async def scrape_power(page):
     await page.goto(URL_POWER, wait_until="networkidle", timeout=90000)
@@ -60,10 +53,8 @@ async def scrape_power(page):
         body_text = await page.locator("body").inner_text()
         nums = re.findall(r"\d{1,3}(?:,\d{3})+", body_text)
         if nums: result["总电力值"] = max(int(n.replace(",", "")) for n in nums)
-    except:
-        pass
+    except: pass
     return result
-
 
 def load_all_rows():
     if not os.path.exists(CSV_FILE): return [], []
@@ -72,50 +63,37 @@ def load_all_rows():
             with open(CSV_FILE, "r", encoding=enc, newline="") as f:
                 content = list(csv.reader(f))
             return content[0], content[1:]
-        except:
-            continue
+        except: continue
     return [], []
-
 
 def parse_dt_loose(s):
     if not s: return None
     s = re.sub(r'(\d+[/-]\d+[/-]\d+)\s+(\d{1}):', r'\1 0\2:', s)
     s = s.strip().replace("/", "-")
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
-        try:
-            return datetime.strptime(s, fmt)
-        except:
-            pass
+        try: return datetime.strptime(s, fmt)
+        except: pass
     return None
-
 
 def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
-
-    # 因为我们在 append_csv 里已经把时间变成了整点，这里直接找上一个小时即可
     curr_hour_str = fmt_no_pad(curr_dt)
     prev_hour_str = fmt_no_pad(curr_dt - timedelta(hours=1))
-
     for row in reversed(all_rows):
         if not row or len(row) < 10: continue
-        if row[0].startswith(curr_hour_str) and curr_dt.minute <= 5: pass
         if row[0].startswith(prev_hour_str): return row
     return None
-
 
 def append_csv(row_dict):
     file_exists = os.path.exists(CSV_FILE)
     header, all_rows = load_all_rows()
     curr_dt = datetime.strptime(row_dict["时间"], "%Y-%m-%d %H:%M:%S")
 
-    # 【核心修改点】：如果在 59 分运行，向后进位变成下个整点
     if curr_dt.minute >= 50:
         curr_dt = curr_dt + timedelta(minutes=(60 - curr_dt.minute))
 
     formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} {curr_dt.hour:02d}:{curr_dt.minute:02d}"
-
-    # 为了计算增幅，我们需要找上一小时的数据
     prev_row = get_prev_hour_record(curr_dt, all_rows)
 
     def calc_delta(curr_val, col_idx):
@@ -124,8 +102,7 @@ def append_csv(row_dict):
             prev_val_str = prev_row[col_idx]
             if prev_val_str == "" or prev_val_str is None: return ""
             return int(curr_val) - int(prev_val_str)
-        except:
-            return ""
+        except: return ""
 
     row = [
         formatted_time,
@@ -139,20 +116,14 @@ def append_csv(row_dict):
     with open(CSV_FILE, "a", encoding="utf-8-sig", newline="") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(
-                ["时间", "心动人数1", "增幅", "团建电力值1", "增幅", "心动人数2", "增幅", "团建电力值2", "增幅",
-                 "总电力值", "增幅"])
+            writer.writerow(["时间", "心动人数1", "增幅", "团建电力值1", "增幅", "心动人数2", "增幅", "团建电力值2", "增幅", "总电力值", "增幅"])
         writer.writerow(row)
-    print(f"✅ [{formatted_time}] 写入完成。\n")
-
+    print(f"✅ [{formatted_time}] 数据已写入 CSV。")
 
 # ============ 图表生成 ============
 def to_float(v):
-    try:
-        return float(v) if v not in (None, "") else None
-    except:
-        return None
-
+    try: return float(v) if v not in (None, "") else None
+    except: return None
 
 def fmt_w(v):
     if v is None: return ""
@@ -160,8 +131,7 @@ def fmt_w(v):
     w = abs(v) / 10000.0
     return f"{sign}{int(round(w))}w" if abs(w - round(w)) < 1e-9 else f"{sign}{w:.1f}w"
 
-
-def generate_chart(target_date, save_path, is_final=False):
+def generate_chart(target_date, save_path):
     header, rows = load_all_rows()
     if not rows: return
 
@@ -170,18 +140,11 @@ def generate_chart(target_date, save_path, is_final=False):
         if len(r) < 10: continue
         dt = parse_dt_loose(r[0])
         if dt is None: continue
-
         target_date_str = dt.strftime('%Y-%m-%d')
-
-        rec = {"dt": dt, "hour": dt.hour, "minute": dt.minute,
-               "heart": to_float(r[1]), "heart_delta": to_float(r[2]),
-               "team1": to_float(r[3]), "delta": to_float(r[4])}
-
-        # 因为我们现在全都是整点数据了，直接存
+        rec = {"dt": dt, "hour": dt.hour, "minute": dt.minute, "heart": to_float(r[1]), "heart_delta": to_float(r[2]), "team1": to_float(r[3]), "delta": to_float(r[4])}
         if dt.hour == 0:
             data_map[f"{target_date_str}_0"] = rec
             continue
-
         key = f"{target_date_str}_{dt.hour}"
         data_map.setdefault(key, rec)
 
@@ -194,71 +157,49 @@ def generate_chart(target_date, save_path, is_final=False):
     active_dates = set()
     for k in data_map.keys():
         parts = k.split("_")
-        if len(parts) >= 2:
-            active_dates.add(parts[0])
+        if len(parts) >= 2: active_dates.add(parts[0])
     week_dates_str = sorted([d for d in active_dates if start_week_date.strftime("%Y-%m-%d") <= d <= today_str])
     week_dates = [datetime.strptime(d, "%Y-%m-%d").date() for d in week_dates_str]
     if not week_dates: week_dates = [yest_date, target_date]
 
     hours = list(range(0, 25))
-
-    plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei", "Microsoft YaHei", "SimHei", "Arial Unicode MS",
-                                       "DejaVu Sans"]
+    plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei", "Microsoft YaHei", "SimHei", "Arial Unicode MS", "DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"] = False
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
-    fig.suptitle(f"本周数据对比 (结算日: {target_date})" if is_final else f"今天({target_date}) 本周数据对比",
-                 fontsize=18, fontweight="bold", color="#D35400", y=0.96)
+    fig.suptitle(f"本周数据对比 (结算日: {target_date})", fontsize=18, fontweight="bold", color="#D35400", y=0.96)
 
     today_delta_sum = 0
     for h in range(0, 25):
-        if h == 0:
-            rec = data_map.get(f"{today_str}_0")
-        elif h == 24:
-            # 24点用下一天的0点
-            rec = data_map.get(f"{next_str}_0")
-        else:
-            rec = data_map.get(f"{today_str}_{h}")
-        if rec and rec["delta"] is not None:
-            today_delta_sum += rec["delta"]
+        if h == 0: rec = data_map.get(f"{today_str}_0")
+        elif h == 24: rec = data_map.get(f"{next_str}_0")
+        else: rec = data_map.get(f"{today_str}_{h}")
+        if rec and rec["delta"] is not None: today_delta_sum += rec["delta"]
 
     yest_delta_sum = 0
     for h in range(0, 25):
-        if h == 0:
-            rec = data_map.get(f"{yest_str}_0")
-        elif h == 24:
-            rec = data_map.get(f"{today_str}_0")
-        else:
-            rec = data_map.get(f"{yest_str}_{h}")
-        if rec and rec["delta"] is not None:
-            yest_delta_sum += rec["delta"]
+        if h == 0: rec = data_map.get(f"{yest_str}_0")
+        elif h == 24: rec = data_map.get(f"{today_str}_0")
+        else: rec = data_map.get(f"{yest_str}_{h}")
+        if rec and rec["delta"] is not None: yest_delta_sum += rec["delta"]
 
-    fig.text(0.5, 0.91, f"昨日增幅总和: {fmt_w(yest_delta_sum)}   |   今日增幅总和: {fmt_w(today_delta_sum)}",
-             ha='center', fontsize=14, fontweight='bold', color='#555555',
-             bbox=dict(facecolor='#FDF2E9', edgecolor='#FFB27A', boxstyle='round,pad=0.5'))
+    fig.text(0.5, 0.91, f"昨日增幅总和: {fmt_w(yest_delta_sum)}   |   今日增幅总和: {fmt_w(today_delta_sum)}", ha='center', fontsize=14, fontweight='bold', color='#555555', bbox=dict(facecolor='#FDF2E9', edgecolor='#FFB27A', boxstyle='round,pad=0.5'))
 
     color_yest_line, color_today_line = "#FFB3C6", "#FF8C42"
-
     ax1 = axes[0]
 
     for d in week_dates:
         d_str = d.strftime("%Y-%m-%d")
-        if d == target_date or d == yest_date:
-            continue
-
+        if d == target_date or d == yest_date: continue
         vals = []
         for h in hours:
-            if h == 0:
-                rec = data_map.get(f"{d_str}_0")
+            if h == 0: rec = data_map.get(f"{d_str}_0")
             elif h == 24:
                 next_key = (datetime.strptime(d_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
                 rec = data_map.get(f"{next_key}_0")
-            else:
-                rec = data_map.get(f"{d_str}_{h}")
-
+            else: rec = data_map.get(f"{d_str}_{h}")
             val = rec["heart"] if rec and rec["heart"] is not None else float("nan")
             vals.append(val)
-
         ax1.plot(hours, vals, linestyle="--", color="#B0B0B0", linewidth=1.2, alpha=0.8)
 
     yest_heart, today_heart = [], []
@@ -272,40 +213,28 @@ def generate_chart(target_date, save_path, is_final=False):
         else:
             y_data = data_map.get(f"{yest_str}_{h}")
             t_data = data_map.get(f"{today_str}_{h}")
-
         y_val = y_data["heart"] if y_data and y_data["heart"] is not None else float("nan")
         t_val = t_data["heart"] if t_data and t_data["heart"] is not None else float("nan")
-
         yest_heart.append(y_val)
         today_heart.append(t_val)
 
-    ax1.plot(hours, yest_heart, marker="o", linestyle="-", color=color_yest_line, linewidth=2.0, markersize=6,
-             label="昨天心动人数")
-    ax1.plot(hours, today_heart, marker="o", linestyle="-", color=color_today_line, linewidth=2.5, markersize=6,
-             label="今天心动人数")
+    ax1.plot(hours, yest_heart, marker="o", linestyle="-", color=color_yest_line, linewidth=2.0, markersize=6, label="昨天心动人数")
+    ax1.plot(hours, today_heart, marker="o", linestyle="-", color=color_today_line, linewidth=2.5, markersize=6, label="今天心动人数")
 
     for h, val in zip(hours, yest_heart):
         if val is not None and not (isinstance(val, float) and val != val):
-            ax1.annotate(f'{int(val):,}', (h, val), textcoords="offset points", xytext=(0, 8), ha='center', fontsize=8,
-                         color="#B36B7A", fontweight="bold")
+            ax1.annotate(f'{int(val):,}', (h, val), textcoords="offset points", xytext=(0, 8), ha='center', fontsize=8, color="#B36B7A", fontweight="bold")
 
     for h, val in zip(hours, today_heart):
         if val is not None and not (isinstance(val, float) and val != val):
-            ax1.annotate(f'{int(val):,}', (h, val), textcoords="offset points", xytext=(0, -14), ha='center',
-                         fontsize=8, color="#D35400", fontweight="bold")
-
-            if h == 0:
-                t_data = data_map.get(f"{today_str}_0")
-            elif h == 24:
-                t_data = data_map.get(f"{next_str}_0")
-            else:
-                t_data = data_map.get(f"{today_str}_{h}")
-
+            ax1.annotate(f'{int(val):,}', (h, val), textcoords="offset points", xytext=(0, -14), ha='center', fontsize=8, color="#D35400", fontweight="bold")
+            if h == 0: t_data = data_map.get(f"{today_str}_0")
+            elif h == 24: t_data = data_map.get(f"{next_str}_0")
+            else: t_data = data_map.get(f"{today_str}_{h}")
             delta = t_data["heart_delta"] if t_data else None
             if delta is not None:
                 sign = "+" if delta > 0 else ""
-                ax1.annotate(f'({sign}{int(delta):,})', (h, val), textcoords="offset points", xytext=(0, 6),
-                             ha='center', fontsize=7, color="#E65100", fontweight="bold")
+                ax1.annotate(f'({sign}{int(delta):,})', (h, val), textcoords="offset points", xytext=(0, 6), ha='center', fontsize=7, color="#E65100", fontweight="bold")
 
     ax1.set_title("心动人数1 对比 (本周)", fontsize=14, fontweight="bold", pad=10, color="#333333")
     ax1.set_ylabel("心动人数", fontsize=11)
@@ -318,35 +247,25 @@ def generate_chart(target_date, save_path, is_final=False):
     ax2 = axes[1]
     for d in week_dates:
         d_str = d.strftime("%Y-%m-%d")
-        if d == target_date:
-            color_hex, line_style, width, is_label = "#FF8C42", "-", 2.5, True
-        elif d == yest_date:
-            color_hex, line_style, width, is_label = "#FFB3C6", "-", 2.0, True
-        else:
-            color_hex, line_style, width, is_label = "#B0B0B0", "--", 1.2, False
+        if d == target_date: color_hex, line_style, width, is_label = "#FF8C42", "-", 2.5, True
+        elif d == yest_date: color_hex, line_style, width, is_label = "#FFB3C6", "-", 2.0, True
+        else: color_hex, line_style, width, is_label = "#B0B0B0", "--", 1.2, False
 
         vals, totals = [], []
         for h in hours:
             if h == 0:
                 rec0 = data_map.get(f"{d_str}_0")
-                if rec0 and rec0["delta"] is not None:
-                    vals.append(rec0["delta"])
-                else:
-                    vals.append(float("nan"))
+                vals.append(rec0["delta"] if rec0 and rec0["delta"] is not None else float("nan"))
                 totals.append(rec0["team1"] if rec0 and rec0["team1"] is not None else None)
                 continue
-
             if h == 24:
                 next_key = (datetime.strptime(d_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
                 rec = data_map.get(f"{next_key}_0")
-            else:
-                rec = data_map.get(f"{d_str}_{h}")
-
+            else: rec = data_map.get(f"{d_str}_{h}")
             vals.append(rec["delta"] if rec and rec["delta"] is not None else float("nan"))
             totals.append(rec["team1"] if rec and rec["team1"] is not None else None)
 
-        ax2.plot(hours, vals, marker="o" if is_label else None, linestyle=line_style, color=color_hex, linewidth=width,
-                 markersize=6 if is_label else 0, alpha=1.0 if is_label else 0.8)
+        ax2.plot(hours, vals, marker="o" if is_label else None, linestyle=line_style, color=color_hex, linewidth=width, markersize=6 if is_label else 0, alpha=1.0 if is_label else 0.8)
 
         if is_label:
             for j, h in enumerate(hours):
@@ -355,12 +274,9 @@ def generate_chart(target_date, save_path, is_final=False):
                     offset_y = -25 if d == yest_date else 16
                     text_color = "#B36B7A" if d == yest_date else "#D35400"
                     fw = "normal" if d == yest_date else "bold"
-                    ax2.annotate(fmt_w(v), (h, v), textcoords="offset points", xytext=(0, offset_y), ha="center",
-                                 fontsize=8, color=text_color, fontweight=fw)
+                    ax2.annotate(fmt_w(v), (h, v), textcoords="offset points", xytext=(0, offset_y), ha="center", fontsize=8, color=text_color, fontweight=fw)
                     if tot is not None:
-                        ax2.annotate(f"总:{fmt_w(tot)}", (h, v), textcoords="offset points",
-                                     xytext=(0, offset_y - 15 if d == yest_date else 28), ha="center", fontsize=7,
-                                     color=text_color)
+                        ax2.annotate(f"总:{fmt_w(tot)}", (h, v), textcoords="offset points", xytext=(0, offset_y - 15 if d == yest_date else 28), ha="center", fontsize=7, color=text_color)
 
     ax2.set_title("团建电力值1 增幅对比 (本周)", fontsize=14, fontweight="bold", pad=10, color="#333333")
     ax2.set_ylabel("每小时增幅", fontsize=11)
@@ -370,13 +286,7 @@ def generate_chart(target_date, save_path, is_final=False):
     ax2.spines['right'].set_visible(False)
     ax2.set_xlim(0, 24)
 
-    def time_formatter(x, pos):
-        if x == 0: return "00:00"
-        if x == 24: return "24:00"
-        return f"{int(x):02d}:00"
-
-    formatter = ticker.FuncFormatter(time_formatter)
-
+    formatter = ticker.FuncFormatter(lambda x, pos: "24:00" if x == 24 else f"{int(x):02d}:00")
     ax2.xaxis.set_major_formatter(formatter)
     ax2.xaxis.set_major_locator(ticker.MultipleLocator(1))
     ax2.set_xlabel("时段", fontsize=11)
@@ -397,14 +307,12 @@ def generate_chart(target_date, save_path, is_final=False):
         Line2D([0], [0], color="#FF8C42", lw=2.5, linestyle="-", label=f"今天增幅 ({target_date})"),
         Line2D([0], [0], color="#FFB3C6", lw=2.0, linestyle="-", label=f"昨天增幅 ({yest_date})")
     ])
-
     fig.legend(handles=handles, loc='upper center', bbox_to_anchor=(0.5, 0.87), ncol=3, frameon=False, fontsize=11)
 
     fig.tight_layout(rect=[0, 0, 1, 0.85])
     fig.savefig(save_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"图表已生成：{save_path}")
-
+    print(f"🖼️ 图表已生成：{save_path}")
 
 # ============ 主流程 ============
 async def run_once():
@@ -412,13 +320,10 @@ async def run_once():
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
+        context = await browser.new_context(user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
         page = await context.new_page()
 
         data = {"时间": now_bj.strftime("%Y-%m-%d %H:%M:%S")}
-        curr_dt = now_bj
-
         t1 = await scrape_team(page, URL_TEAM1)
         data["今日心动人数1"], data["团建电力值1"] = t1["今日心动人数"], t1["团建电力值"]
         data["今日心动人数2"], data["团建电力值2"] = None, None
@@ -427,31 +332,29 @@ async def run_once():
         await browser.close()
 
     if data["今日心动人数1"] is None and data["团建电力值1"] is None and data["总电力值"] is None:
-        print("❌ 抓取失败：所有数据均为空，可能是网页加载超时或网络问题。")
-        print(f"当前抓取时间: {data['时间']}")
+        print("❌ 抓取失败：数据为空。")
         return
 
+    # 写入 CSV 数据
     append_csv(data)
 
-    try:
-        # 如果是在 59 分跑，这里会进位到下一天的 0 点，所以用进位后的日期来画图
-        chart_date = curr_dt
-        if chart_date.minute >= 50:
-            chart_date = chart_date + timedelta(minutes=(60 - chart_date.minute))
-
-        today_date = chart_date.date()
-        generate_chart(today_date, CHART_FILE)
-    except Exception as e:
-        print(f"生成图表失败: {e}")
-
+    # 【核心判断】只在 23:50 到 23:59 之间生成图片留档
+    if now_bj.hour == 23 and now_bj.minute >= 50:
+        print("🕛 触发 23:59 最终结算机制，正在生成图片留档...")
+        try:
+            today_date = now_bj.date()
+            generate_chart(today_date, CHART_FILE)
+        except Exception as e:
+            print(f"生成图表失败: {e}")
+    else:
+        print("⚡ 非结算时间，已跳过图片生成，仅更新数据。")
 
 async def main():
-    print("定时任务已启动 (GitHub Actions 单次模式)...")
+    print("定时任务已启动...")
     try:
         await run_once()
     except Exception as e:
         print(f"[抓取失败]: {e}")
-
 
 if __name__ == "__main__":
     asyncio.run(main())
