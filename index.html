@@ -103,13 +103,13 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            min-width: 600px; /* 强制最小宽度，手机端就可以滑动了 */
+            min-width: 800px;
         }
         th, td {
             padding: 10px 6px;
             text-align: right;
             border-bottom: 1px solid #eee;
-            white-space: nowrap; /* 防止换行 */
+            white-space: nowrap;
         }
         th {
             background-color: #fdf2e9;
@@ -123,7 +123,7 @@
         /* 数字高亮 */
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
-        .val-total { font-weight: bold; color: #2980b9; } /* 总电力用蓝色高亮 */
+        .val-total { font-weight: bold; color: #2980b9; } 
         
         /* 增幅颜色 */
         .up { color: #e74c3c; font-weight: bold; }
@@ -156,10 +156,11 @@
                             <th>团建电力</th>
                             <th>电力增幅</th>
                             <th>总电力值</th>
+                            <th>总电增幅</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td colspan="6" style="text-align:center;">数据加载中...</td></tr>
+                        <tr><td colspan="7" style="text-align:center;">数据加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -191,17 +192,25 @@
         
         const todayStr = getBeijingDate();
         
+        // 【核心修复点】：将时间统一格式化为 HH:00
         function parseTimeStr(str) {
             if (!str) return "";
             let parts = str.split(' ');
-            return parts.length > 1 ? parts[1] : str;
+            if (parts.length > 1) {
+                let timeParts = parts[1].split(':');
+                if (timeParts.length >= 1) {
+                    // 将 1:00 补齐为 01:00，将 24:00 也正常处理
+                    let hour = parseInt(timeParts[0], 10);
+                    return (hour < 10 ? '0' + hour : hour) + ':00';
+                }
+            }
+            return str;
         }
 
         function formatNum(num) {
             return num ? Number(num).toLocaleString() : '-';
         }
 
-        // 带颜色格式化的增幅
         function formatDelta(num) {
             if (num === null || num === undefined || num === '' || isNaN(num)) return '-';
             const val = Number(num);
@@ -237,14 +246,13 @@
 
                     if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
                     
-                    const powerDelta = Number(cols[4]) || 0;
-
                     globalDataMap[formattedDate][timeHour] = {
                         heart: Number(cols[1]) || null,
                         heartDelta: cols[2] !== '' ? Number(cols[2]) : null,
                         power: Number(cols[3]) || null,
                         powerDelta: cols[4] !== '' ? Number(cols[4]) : null,
-                        totalPower: Number(cols[9]) || null // 取第10列总电力
+                        totalPower: Number(cols[9]) || null,
+                        totalDelta: cols[10] !== '' ? Number(cols[10]) : null
                     };
                 });
 
@@ -315,7 +323,7 @@
             tbody.innerHTML = '';
 
             if (latestRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">暂无数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">暂无数据</td></tr>';
             } else {
                 latestRows.forEach(row => {
                     const tr = document.createElement('tr');
@@ -326,6 +334,7 @@
                         <td class="val-power">${formatNum(row.power)}</td>
                         <td>${formatDelta(row.powerDelta)}</td>
                         <td class="val-total">${formatNum(row.totalPower)}</td>
+                        <td>${formatDelta(row.totalDelta)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -342,6 +351,7 @@
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
                         return dataMap[date][h][key];
                     }
+                    // 如果某天 0点 没有数据，给它补 0，避免线从中间连过去
                     if (h === '00:00' && dataMap[date]) return 0;
                     return null;
                 });
