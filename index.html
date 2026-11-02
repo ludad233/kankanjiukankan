@@ -14,6 +14,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            overflow-x: hidden;
         }
         .container {
             width: 100%;
@@ -21,23 +22,50 @@
         }
         .card {
             background: white;
-            padding: 12px 8px; /* 手机端极简内边距 */
+            padding: 12px 8px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 12px;
-            overflow: hidden; /* 禁止横向溢出 */
+            overflow: hidden;
         }
         
-        /* 图表容器：去掉强制宽度，让 ECharts 自适应 */
-        .chart-wrapper {
+        /* 顶部日期选择器样式 */
+        .header-bar {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+            gap: 10px;
+        }
+        .date-select {
+            font-size: 16px;
+            font-weight: bold;
+            color: #D35400;
+            background-color: #FDF2E9;
+            border: 1px solid #FFB27A;
+            border-radius: 8px;
+            padding: 8px 12px;
+            outline: none;
+            appearance: none;
+        }
+
+        .chart-scroll-box {
             width: 100%;
-            height: 320px; /* 手机端高度稍微降低，避免太长 */
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+        }
+        .chart-scroll-box::-webkit-scrollbar { display: none; }
+
+        .chart-wrapper {
+            width: 900px; 
+            height: 350px;
         }
 
         .title {
             text-align: center;
             color: #D35400;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             margin: 5px 0 10px 0;
         }
@@ -83,13 +111,20 @@
 </head>
 <body>
     <div class="container">
-        
-        <!-- 表格区域 -->
-        <div class="card">
-            <h3>最近 10 条数据明细</h3>
+        <!-- 日期选择区 -->
+        <div class="card" style="padding: 10px; text-align: center;">
+            <div class="header-bar">
+                <span>选择查看日期：</span>
+                <select id="dateSelector" class="date-select"></select>
+            </div>
             <div class="stats-wrap">
                 <div class="stats" id="tableSumStats">总计计算中...</div>
             </div>
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="card">
+            <h3 id="tableTitle">数据明细</h3>
             <table id="dataTable">
                 <thead>
                     <tr>
@@ -106,12 +141,16 @@
 
         <!-- 图表区域 -->
         <div class="card">
-            <div class="title">今天 <span id="todayDate"></span> 数据对比</div>
-            <div class="chart-wrapper" id="chartHeart"></div>
+            <div class="title">趋势对比 (👈左右滑动👉)</div>
+            <div class="chart-scroll-box">
+                <div class="chart-wrapper" id="chartHeart"></div>
+            </div>
         </div>
 
         <div class="card">
-            <div class="chart-wrapper" id="chartPower"></div>
+            <div class="chart-scroll-box">
+                <div class="chart-wrapper" id="chartPower" style="height: 300px;"></div>
+            </div>
         </div>
     </div>
 
@@ -124,13 +163,7 @@
         }
         
         const todayStr = getBeijingDate();
-        const todayDateObj = new Date(todayStr);
-        const yestDateObj = new Date(todayDateObj);
-        yestDateObj.setDate(yestDateObj.getDate() - 1);
-        const yestStr = yestDateObj.toISOString().split('T')[0];
         
-        document.getElementById('todayDate').innerText = todayStr;
-
         function parseTimeStr(str) {
             if (!str) return "";
             let parts = str.split(' ');
@@ -146,15 +179,13 @@
         chartHeart.showLoading();
         chartPower.showLoading();
 
+        let globalDataMap = {}; // 存储所有解析后的数据
+
         fetch('power_data.csv?t=' + new Date().getTime())
             .then(res => res.text())
             .then(csv => {
                 const lines = csv.trim().split('\n').slice(1);
-                const dataMap = {};
                 const datesSet = new Set();
-
-                let yestTotalDelta = 0;
-                let todayTotalDelta = 0;
 
                 lines.forEach(line => {
                     const cols = line.split(',');
@@ -163,178 +194,194 @@
                     const timeStr = cols[0].trim();
                     const datePart = timeStr.split(' ')[0].replace(/\//g, '-');
                     const dArr = datePart.split('-');
+                    // 标准格式 2026-11-02
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
                     const timeHour = parseTimeStr(timeStr);
                     datesSet.add(formattedDate);
 
-                    if (!dataMap[formattedDate]) dataMap[formattedDate] = {};
+                    if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
                     
                     const powerDelta = Number(cols[4]) || 0;
 
-                    dataMap[formattedDate][timeHour] = {
+                    globalDataMap[formattedDate][timeHour] = {
                         heart: Number(cols[1]) || null,
                         heartDelta: Number(cols[2]) || null,
                         power: Number(cols[3]) || null,
                         powerDelta: powerDelta
                     };
-
-                    if (formattedDate === todayStr) todayTotalDelta += powerDelta;
-                    if (formattedDate === yestStr) yestTotalDelta += powerDelta;
                 });
 
-                function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
-                document.getElementById('tableSumStats').innerText = `昨总: ${fmtW(yestTotalDelta)} | 今总: ${fmtW(todayTotalDelta)}`;
-
-                // --- 渲染表格 ---
-                const dataRows = lines.map(row => row.split(','));
-                const latestRows = dataRows.slice(-10).reverse();
-                const tbody = document.querySelector('#dataTable tbody');
-                tbody.innerHTML = '';
-
-                latestRows.forEach(row => {
-                    const tr = document.createElement('tr');
-                    const indexesToShow = [0, 1, 3]; 
-                    
-                    indexesToShow.forEach((idx, i) => {
-                        const td = document.createElement('td');
-                        let val = row[idx] ? row[idx].trim() : '-';
-                        
-                        if (i !== 0 && val !== '-' && val !== '') {
-                            if (!isNaN(val)) {
-                                val = formatNum(val);
-                            }
-                        }
-                        td.textContent = val;
-                        tr.appendChild(td);
-                    });
-                    tbody.appendChild(tr);
-                });
-
-                // --- 渲染图表 ---
-                const xAxisHours = [];
-                for (let i = 0; i <= 24; i++) {
-                    xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
-                }
-
-                const sortedDates = Array.from(datesSet).sort();
-                const activeDates = sortedDates.filter(d => d >= '2026-11-01').slice(-6);
-
-                function getSeriesData(date, key) {
-                    return xAxisHours.map(h => {
-                        return dataMap[date] && dataMap[date][h] ? dataMap[date][h][key] : null;
-                    });
-                }
-
-                const heartSeries = [];
+                // 1. 填充下拉菜单
+                const sortedDates = Array.from(datesSet).sort().reverse(); // 最新的日期在最上面
+                const selector = document.getElementById('dateSelector');
                 
-                // 1. 把所有前几天的灰色虚线加回来 (排除今天和昨天)
-                activeDates.forEach(date => {
-                    if (date === todayStr || date === yestStr) return;
-                    
-                    // 获取月-日作为图例
-                    const shortDate = date.substring(5); 
-
-                    heartSeries.push({
-                        name: shortDate, 
-                        type: 'line', 
-                        data: getSeriesData(date, 'heart'),
-                        smooth: true, 
-                        symbol: 'none', 
-                        lineStyle: { color: '#ccc', width: 1.5, type: 'dashed' },
-                        emphasis: { disabled: true } // 鼠标悬浮时不再高亮灰线，防止干扰
-                    });
+                sortedDates.forEach(date => {
+                    const opt = document.createElement('option');
+                    opt.value = date;
+                    opt.innerText = date;
+                    selector.appendChild(opt);
                 });
 
-                // 2. 昨天和今天
-                if (dataMap[yestStr]) {
-                    heartSeries.push({
-                        name: '昨天', type: 'line', data: getSeriesData(yestStr, 'heart'),
-                        smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
-                    });
-                }
-                if (dataMap[todayStr]) {
-                    heartSeries.push({
-                        name: '今天', type: 'line', data: getSeriesData(todayStr, 'heart'),
-                        smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
-                    });
+                // 默认选中今天（如果没有今天，就选中最新的一天）
+                if (datesSet.has(todayStr)) {
+                    selector.value = todayStr;
+                } else if (sortedDates.length > 0) {
+                    selector.value = sortedDates[0];
                 }
 
-                chartHeart.hideLoading();
-                chartHeart.setOption({
-                    tooltip: { 
-                        trigger: 'axis',
-                        confine: true // 防止提示框超出手机屏幕
-                    },
-                    legend: { 
-                        top: '0%', 
-                        itemWidth: 15, 
-                        itemHeight: 10,
-                        textStyle: { fontSize: 11 } // 手机端图例文字缩小
-                    },
-                    grid: { left: '12%', right: '5%', bottom: '10%', top: '20%', containLabel: true },
-                    xAxis: { 
-                        type: 'category', 
-                        boundaryGap: false, 
-                        data: xAxisHours, 
-                        axisLabel: { 
-                            interval: 3, // 关键优化：每隔 3 小时显示一个 (00, 03, 06...)
-                            fontSize: 10 
-                        } 
-                    },
-                    yAxis: { 
-                        type: 'value', 
-                        name: '人数', 
-                        scale: true,
-                        axisLabel: {
-                            fontSize: 10,
-                            formatter: function(value) {
-                                return value >= 10000 ? (value / 10000) + 'w' : value;
-                            }
-                        }
-                    },
-                    series: heartSeries
+                // 2. 监听下拉菜单变化，重新渲染
+                selector.addEventListener('change', (e) => {
+                    renderPage(e.target.value);
                 });
 
-                const powerSeries = [];
-                if (dataMap[yestStr]) {
-                    powerSeries.push({
-                        name: '昨天增幅', type: 'line', data: getSeriesData(yestStr, 'powerDelta'),
-                        smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
-                    });
-                }
-                if (dataMap[todayStr]) {
-                    powerSeries.push({
-                        name: '今天增幅', type: 'line', data: getSeriesData(todayStr, 'powerDelta'),
-                        smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
-                    });
-                }
-
-                chartPower.hideLoading();
-                chartPower.setOption({
-                    tooltip: { trigger: 'axis', confine: true },
-                    title: { text: '电力增幅对比', left: 'center', top: 0, textStyle: { fontSize: 13, color: '#333' } },
-                    legend: { top: '12%', itemWidth: 15, itemHeight: 10, textStyle: { fontSize: 11 } },
-                    grid: { left: '12%', right: '5%', bottom: '10%', top: '30%', containLabel: true },
-                    xAxis: { 
-                        type: 'category', 
-                        boundaryGap: false, 
-                        data: xAxisHours, 
-                        axisLabel: { interval: 3, fontSize: 10 } 
-                    },
-                    yAxis: { 
-                        type: 'value', 
-                        name: '增幅', 
-                        scale: true,
-                        axisLabel: { fontSize: 10 }
-                    },
-                    series: powerSeries
-                });
+                // 首次渲染
+                renderPage(selector.value);
             })
             .catch(err => {
                 console.error('数据加载失败:', err);
                 document.getElementById('tableSumStats').innerText = '数据加载失败';
             });
+
+        // --- 核心渲染函数 ---
+        function renderPage(selectedDate) {
+            const dataMap = globalDataMap;
+            // 计算选中日期的前一天
+            const selDateObj = new Date(selectedDate);
+            const prevDateObj = new Date(selDateObj);
+            prevDateObj.setDate(prevDateObj.getDate() - 1);
+            const prevDateStr = prevDateObj.toISOString().split('T')[0];
+
+            // 1. 渲染表格 & 顶部总计
+            let selectedTotalDelta = 0;
+            let prevTotalDelta = 0;
+            
+            // 计算选中日的总增幅
+            if (dataMap[selectedDate]) {
+                Object.values(dataMap[selectedDate]).forEach(d => {
+                    if (d.powerDelta) selectedTotalDelta += d.powerDelta;
+                });
+            }
+            // 计算前一天的总增幅
+            if (dataMap[prevDateStr]) {
+                Object.values(dataMap[prevDateStr]).forEach(d => {
+                    if (d.powerDelta) prevTotalDelta += d.powerDelta;
+                });
+            }
+            
+            function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
+            document.getElementById('tableSumStats').innerText = 
+                `${prevDateStr} 总增幅: ${fmtW(prevTotalDelta)} | ${selectedDate} 总增幅: ${fmtW(selectedTotalDelta)}`;
+            document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
+
+            // 整理当天的数据为数组，并按时间排序
+            let dayDataList = [];
+            if (dataMap[selectedDate]) {
+                for (const [time, data] of Object.entries(dataMap[selectedDate])) {
+                    dayDataList.push({ time, ...data });
+                }
+                // 按时间从晚到早排序
+                dayDataList.sort((a, b) => b.time.localeCompare(a.time));
+            }
+            
+            // 截取最后10条
+            const latestRows = dayDataList.slice(0, 10);
+            const tbody = document.querySelector('#dataTable tbody');
+            tbody.innerHTML = '';
+
+            if (latestRows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">暂无数据</td></tr>';
+            } else {
+                latestRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${row.time}</td>
+                        <td>${formatNum(row.heart)}</td>
+                        <td>${formatNum(row.power)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+
+            // 2. 渲染图表
+            const xAxisHours = [];
+            for (let i = 0; i <= 24; i++) {
+                xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
+            }
+
+            function getSeriesData(date, key) {
+                return xAxisHours.map(h => {
+                    return dataMap[date] && dataMap[date][h] ? dataMap[date][h][key] : null;
+                });
+            }
+
+            const heartSeries = [];
+            
+            // 选中的日期：橙色
+            if (dataMap[selectedDate]) {
+                heartSeries.push({
+                    name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'heart'),
+                    smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
+                });
+            }
+            // 前一天：粉色
+            if (dataMap[prevDateStr]) {
+                heartSeries.push({
+                    name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'heart'),
+                    smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
+                });
+            }
+
+            // 获取其他所有日期的灰色虚线
+            const allDates = Object.keys(dataMap).sort();
+            allDates.forEach(date => {
+                if (date === selectedDate || date === prevDateStr) return;
+                heartSeries.push({
+                    name: date.substring(5), type: 'line', data: getSeriesData(date, 'heart'),
+                    smooth: true, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' },
+                    emphasis: { disabled: true }
+                });
+            });
+
+            chartHeart.hideLoading();
+            chartHeart.setOption({
+                tooltip: { trigger: 'axis', confine: true },
+                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
+                grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
+                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
+                yAxis: { 
+                    type: 'value', name: '人数', scale: true,
+                    axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } }
+                },
+                series: heartSeries
+            }, true); // true 表示不合并旧数据
+
+            // 渲染增幅图表
+            const powerSeries = [];
+            if (dataMap[selectedDate]) {
+                powerSeries.push({
+                    name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'powerDelta'),
+                    smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
+                });
+            }
+            if (dataMap[prevDateStr]) {
+                powerSeries.push({
+                    name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'powerDelta'),
+                    smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
+                });
+            }
+
+            chartPower.hideLoading();
+            chartPower.setOption({
+                tooltip: { trigger: 'axis', confine: true },
+                title: { text: '电力增幅对比', left: 'center', top: 0, textStyle: { fontSize: 13, color: '#333' } },
+                legend: { top: '10%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
+                grid: { left: '5%', right: '5%', bottom: '10%', top: '25%', containLabel: true },
+                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
+                yAxis: { type: 'value', name: '增幅', scale: true, axisLabel: { fontSize: 11 } },
+                series: powerSeries
+            }, true);
+        }
 
         window.addEventListener('resize', function() {
             chartHeart.resize();
