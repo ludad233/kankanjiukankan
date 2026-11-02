@@ -213,7 +213,9 @@ def generate_chart(target_date, save_path, is_final=False):
 
     hours = list(range(0, 25))
 
-    plt.rcParams["font.sans-serif"] = ["Microsoft YaHei", "SimHei", "Arial Unicode MS", "DejaVu Sans"]
+    # 【修改点】将 WenQuanYi Zen Hei 加入字体列表第一位
+    plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei", "Microsoft YaHei", "SimHei", "Arial Unicode MS",
+                                       "DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"] = False
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
@@ -417,6 +419,7 @@ def generate_chart(target_date, save_path, is_final=False):
 
 # ============ 主流程 ============
 async def run_once():
+    # 获取北京时间 (UTC + 8小时)
     now_bj = datetime.now() + timedelta(hours=8)
 
     async with async_playwright() as p:
@@ -435,11 +438,11 @@ async def run_once():
         data["总电力值"] = pwr["总电力值"]
         await browser.close()
 
-    # ============ 新增防呆判断 ============
+    # 防呆判断：如果没抓到数据，就不写入 CSV
     if data["今日心动人数1"] is None and data["团建电力值1"] is None and data["总电力值"] is None:
         print("❌ 抓取失败：所有数据均为空，可能是网页加载超时或网络问题。")
         print(f"当前抓取时间: {data['时间']}")
-        return  # 直接结束，不写入 CSV，也不生成空图表
+        return
 
     append_csv(data)
     try:
