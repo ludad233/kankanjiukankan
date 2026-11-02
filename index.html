@@ -49,7 +49,7 @@
             appearance: none;
         }
 
-        /* 表格滑动框：允许手指左右滑 */
+        /* 表格滑动框：这是防挤压的核心 */
         .table-scroll-box {
             width: 100%;
             overflow-x: auto;
@@ -67,7 +67,7 @@
         .chart-scroll-box::-webkit-scrollbar { display: none; }
 
         .chart-wrapper {
-            width: 100%;
+            width: 900px; /* 强制图表宽一点方便滑动 */
             height: 350px;
         }
 
@@ -81,14 +81,15 @@
         .stats-wrap { text-align: center; margin-bottom: 10px; padding: 0 10px; }
         .stats {
             text-align: center;
-            font-size: 13px;
+            font-size: 12px; /* 稍微缩小字体 */
             font-weight: bold;
             color: #555;
             background: #FDF2E9;
             border: 1px solid #FFB27A;
             border-radius: 20px;
-            padding: 4px 12px;
+            padding: 6px 10px;
             display: inline-block;
+            line-height: 1.4;
         }
         
         h3 {
@@ -98,12 +99,13 @@
             font-size: 15px;
         }
 
-        /* 表格样式优化：防止手机挤压 */
+        /* 表格样式 */
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            min-width: 750px; /* 强制表格最少 750px 宽，手机必须滑动才能看全 */
+            /* 关键：强制表格最小宽度为 850px，手机上必须滑动才能看全 */
+            min-width: 850px; 
         }
         th, td {
             padding: 10px 8px;
@@ -117,11 +119,12 @@
             font-weight: bold;
             text-align: center;
             font-size: 12px;
+            position: sticky;
+            top: 0;
         }
         
-        /* 左右间距 */
-        th:first-child, td:first-child { padding-left: 15px; text-align: left; color: #666; }
-        th:last-child, td:last-child { padding-right: 15px; }
+        th:first-child, td:first-child { padding-left: 15px; text-align: left; color: #666; position: sticky; left: 0; background: white; z-index: 1;}
+        th:first-child { background: #fdf2e9; z-index: 2; }
         
         /* 数字高亮 */
         .val-heart { font-weight: bold; color: #333; }
@@ -309,7 +312,7 @@
             
             function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
             document.getElementById('tableSumStats').innerText = 
-                `${prevDateStr} 总增幅: ${fmtW(prevTotalDelta)} | ${selectedDate} 总增幅: ${fmtW(selectedTotalDelta)}`;
+                `${prevDateStr} 总增幅: ${fmtW(prevTotalDelta)}\n${selectedDate} 总增幅: ${fmtW(selectedTotalDelta)}`;
             document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
 
             let dayDataList = [];
