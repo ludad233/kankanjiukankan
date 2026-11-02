@@ -16,7 +16,6 @@
             align-items: center;
             overflow-x: hidden;
         }
-        /* 统一所有卡片的宽度 */
         .container {
             width: 100%;
             max-width: 900px; 
@@ -26,7 +25,6 @@
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 12px;
-            /* 去掉左右 padding，让内容顶格，保持绝对同宽 */
             padding: 12px 0; 
             overflow: hidden;
         }
@@ -51,7 +49,7 @@
             appearance: none;
         }
 
-        /* 表格滑动框 */
+        /* 表格滑动框：允许手指左右滑 */
         .table-scroll-box {
             width: 100%;
             overflow-x: auto;
@@ -80,7 +78,7 @@
             font-weight: bold;
             margin: 5px 0 10px 0;
         }
-        .stats-wrap { text-align: center; margin-bottom: 10px; }
+        .stats-wrap { text-align: center; margin-bottom: 10px; padding: 0 10px; }
         .stats {
             text-align: center;
             font-size: 13px;
@@ -100,15 +98,15 @@
             font-size: 15px;
         }
 
-        /* 表格样式优化 */
+        /* 表格样式优化：防止手机挤压 */
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            table-layout: fixed; /* 强制均分列宽 */
+            min-width: 750px; /* 强制表格最少 750px 宽，手机必须滑动才能看全 */
         }
         th, td {
-            padding: 10px 4px;
+            padding: 10px 8px;
             text-align: right;
             border-bottom: 1px solid #eee;
             white-space: nowrap;
@@ -121,18 +119,9 @@
             font-size: 12px;
         }
         
-        /* 给表格左右两端留出和图表坐标轴一样的边距 */
-        th:first-child, td:first-child { padding-left: 16px; text-align: left; color: #666; }
-        th:last-child, td:last-child { padding-right: 16px; }
-
-        /* 各列宽度分配，让数字不被挤变形 */
-        th:nth-child(1) { width: 12%; }
-        th:nth-child(2) { width: 13%; }
-        th:nth-child(3) { width: 14%; }
-        th:nth-child(4) { width: 16%; }
-        th:nth-child(5) { width: 14%; }
-        th:nth-child(6) { width: 17%; }
-        th:nth-child(7) { width: 14%; }
+        /* 左右间距 */
+        th:first-child, td:first-child { padding-left: 15px; text-align: left; color: #666; }
+        th:last-child, td:last-child { padding-right: 15px; }
         
         /* 数字高亮 */
         .val-heart { font-weight: bold; color: #333; }
@@ -147,7 +136,7 @@
 <body>
     <div class="container">
         <!-- 日期选择区 -->
-        <div class="card" style="padding: 10px; text-align: center;">
+        <div class="card" style="padding: 10px 0; text-align: center;">
             <div class="header-bar">
                 <span>选择查看日期：</span>
                 <select id="dateSelector" class="date-select"></select>
@@ -408,11 +397,9 @@
             });
 
             chartHeart.hideLoading();
-            // 将图表设为与容器一致
             chartHeart.setOption({
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                // grid 调整成左右 0% 铺满，靠 containLabel 留白，以对齐表格
                 grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: { type: 'value', name: '人数', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
