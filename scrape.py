@@ -2,7 +2,6 @@ import asyncio
 import csv
 import os
 import re
-import shutil
 from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
 
@@ -15,15 +14,15 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 # ============ 配置 ============
-URL_TEAM1 = "https://y.qq.com/tmead/promotion/h5/team-activity/detail?_hidehd=1&_miniplayer=1&adtag=sszd&singerId=6665073&activityId=17931826095559&searchid=113943832761792946,&hosteuin=ow657wSlownlon**&ADTAG=wxfshare"
+# 已替换为你提供的团建链接（去掉了个人追踪参数，避免泄露）
+URL_TEAM1 = "https://y.qq.com/tmead/promotion/h5/team-activity/detail?singerId=6665073&activityId=17936311664035"
 URL_TEAM2 = None
 URL_POWER = "https://y.qq.com/tmead/promotion/h5/powering/1793152992875?_hidehd=1&_miniplayer=1&adtag=share_task&singerId=6665073&p_share=w2pZEizuC5V-xTHRIivoTwD_5f_DMRfGNgTtS7isP_4&hosteuin=oiEqow6FoiCA7n**&ADTAG=wxfshare"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, "power_data.csv")
 CHART_FILE = os.path.join(BASE_DIR, "comparison_chart.png")
-HISTORY_DIR = os.path.join(BASE_DIR, "history")
-os.makedirs(HISTORY_DIR, exist_ok=True)
+# 已彻底移除 HISTORY_DIR
 
 
 # ============ 抓取与存储 ============
@@ -469,13 +468,7 @@ async def run_once():
 
         today_date = chart_date.date()
         generate_chart(today_date, CHART_FILE)
-
-        if curr_dt.hour == 23 and curr_dt.minute >= 50:
-            archive_name = f"{today_date}.png"
-            archive_path = os.path.join(HISTORY_DIR, archive_name)
-            shutil.copy(CHART_FILE, archive_path)
-            print(f"📁 已生成每日归档图片：{archive_path}")
-
+        # 删除了原来的 23:59 归档到 history 的逻辑
     except Exception as e:
         print(f"生成图表失败: {e}")
 
