@@ -93,13 +93,9 @@ def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
-    # 【修改点 1】：判断条件改为 minute >= 55
-    if curr_dt.hour == 23 and curr_dt.minute >= 55:
-        curr_hour_str = fmt_no_pad(curr_dt.replace(hour=23))
-        prev_hour_str = fmt_no_pad(curr_dt.replace(hour=22))
-    else:
-        curr_hour_str = fmt_no_pad(curr_dt)
-        prev_hour_str = fmt_no_pad(curr_dt - timedelta(hours=1))
+    # 因为我们在 append_csv 里已经把时间变成了整点，这里直接找上一个小时即可
+    curr_hour_str = fmt_no_pad(curr_dt)
+    prev_hour_str = fmt_no_pad(curr_dt - timedelta(hours=1))
 
     for row in reversed(all_rows):
         if not row or len(row) < 10: continue
@@ -113,18 +109,17 @@ def append_csv(row_dict):
     header, all_rows = load_all_rows()
     curr_dt = datetime.strptime(row_dict["时间"], "%Y-%m-%d %H:%M:%S")
 
-    # 【修改点 2】：把 23:55 及以后的数据统一标记为 23:55，并用于计算最终增幅
-    if curr_dt.hour == 23 and curr_dt.minute >= 55:
-        formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} 23:55"
-        curr_dt = curr_dt.replace(hour=23, minute=55)
-    else:
-        formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} {curr_dt.hour:02d}:{curr_dt.minute:02d}"
+    # 【核心修改点】：如果在 59 分运行，向后进位变成下个整点
+    if curr_dt.minute >= 50:
+        curr_dt = curr_dt + timedelta(minutes=(60 - curr_dt.minute))
 
-    is_hourly = (curr_dt.minute <= 5 or curr_dt.minute >= 55)
-    prev_row = get_prev_hour_record(curr_dt, all_rows) if is_hourly else None
+    formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} {curr_dt.hour:02d}:{curr_dt.minute:02d}"
+
+    # 为了计算增幅，我们需要找上一小时的数据
+    prev_row = get_prev_hour_record(curr_dt, all_rows)
 
     def calc_delta(curr_val, col_idx):
-        if not is_hourly or curr_val is None or prev_row is None: return ""
+        if curr_val is None or prev_row is None: return ""
         try:
             prev_val_str = prev_row[col_idx]
             if prev_val_str == "" or prev_val_str is None: return ""
@@ -176,24 +171,15 @@ def generate_chart(target_date, save_path, is_final=False):
         dt = parse_dt_loose(r[0])
         if dt is None: continue
 
-        if dt.minute > 5 and dt.minute < 55:
-            continue
-
         target_date_str = dt.strftime('%Y-%m-%d')
 
         rec = {"dt": dt, "hour": dt.hour, "minute": dt.minute,
                "heart": to_float(r[1]), "heart_delta": to_float(r[2]),
                "team1": to_float(r[3]), "delta": to_float(r[4])}
 
+        # 因为我们现在全都是整点数据了，直接存
         if dt.hour == 0:
             data_map[f"{target_date_str}_0"] = rec
-            continue
-
-        # 【修改点 3】：匹配 55 分及以后的数据
-        if dt.hour == 23 and dt.minute >= 55:
-            next_day_str = (dt + timedelta(days=1)).strftime('%Y-%m-%d')
-            data_map[f"{next_day_str}_0_2355"] = rec  # 键名标记为 2355
-            data_map.setdefault(f"{target_date_str}_23", rec)
             continue
 
         key = f"{target_date_str}_{dt.hour}"
@@ -229,7 +215,8 @@ def generate_chart(target_date, save_path, is_final=False):
         if h == 0:
             rec = data_map.get(f"{today_str}_0")
         elif h == 24:
-            rec = data_map.get(f"{next_str}_0_2355") or data_map.get(f"{next_str}_0")
+            # 24点用下一天的0点
+            rec = data_map.get(f"{next_str}_0")
         else:
             rec = data_map.get(f"{today_str}_{h}")
         if rec and rec["delta"] is not None:
@@ -240,7 +227,7 @@ def generate_chart(target_date, save_path, is_final=False):
         if h == 0:
             rec = data_map.get(f"{yest_str}_0")
         elif h == 24:
-            rec = data_map.get(f"{today_str}_0_2355") or data_map.get(f"{today_str}_0")
+            rec = data_map.get(f"{today_str}_0")
         else:
             rec = data_map.get(f"{yest_str}_{h}")
         if rec and rec["delta"] is not None:
@@ -265,7 +252,7 @@ def generate_chart(target_date, save_path, is_final=False):
                 rec = data_map.get(f"{d_str}_0")
             elif h == 24:
                 next_key = (datetime.strptime(d_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-                rec = data_map.get(f"{next_key}_0_2355") or data_map.get(f"{next_key}_0")
+                rec = data_map.get(f"{next_key}_0")
             else:
                 rec = data_map.get(f"{d_str}_{h}")
 
@@ -280,8 +267,8 @@ def generate_chart(target_date, save_path, is_final=False):
             y_data = data_map.get(f"{yest_str}_0")
             t_data = data_map.get(f"{today_str}_0")
         elif h == 24:
-            y_data = data_map.get(f"{today_str}_0_2355") or data_map.get(f"{today_str}_0")
-            t_data = data_map.get(f"{next_str}_0_2355") or data_map.get(f"{next_str}_0")
+            y_data = data_map.get(f"{today_str}_0")
+            t_data = data_map.get(f"{next_str}_0")
         else:
             y_data = data_map.get(f"{yest_str}_{h}")
             t_data = data_map.get(f"{today_str}_{h}")
@@ -310,7 +297,7 @@ def generate_chart(target_date, save_path, is_final=False):
             if h == 0:
                 t_data = data_map.get(f"{today_str}_0")
             elif h == 24:
-                t_data = data_map.get(f"{next_str}_0_2355") or data_map.get(f"{next_str}_0")
+                t_data = data_map.get(f"{next_str}_0")
             else:
                 t_data = data_map.get(f"{today_str}_{h}")
 
@@ -351,7 +338,7 @@ def generate_chart(target_date, save_path, is_final=False):
 
             if h == 24:
                 next_key = (datetime.strptime(d_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-                rec = data_map.get(f"{next_key}_0_2355") or data_map.get(f"{next_key}_0")
+                rec = data_map.get(f"{next_key}_0")
             else:
                 rec = data_map.get(f"{d_str}_{h}")
 
@@ -445,18 +432,15 @@ async def run_once():
         return
 
     append_csv(data)
-    try:
-        today_date = curr_dt.date()
-        yest_date = today_date - timedelta(days=1)
-        today_history_chart = os.path.join(BASE_DIR, f"{today_date}_vs_{yest_date}.png")
 
-        if not os.path.exists(today_history_chart):
-            yest_history_chart = os.path.join(BASE_DIR, f"{yest_date}_vs_{yest_date - timedelta(days=1)}.png")
-            if not os.path.exists(yest_history_chart):
-                generate_chart(yest_date, yest_history_chart, is_final=True)
-            generate_chart(today_date, CHART_FILE)
-        else:
-            generate_chart(today_date, CHART_FILE)
+    try:
+        # 如果是在 59 分跑，这里会进位到下一天的 0 点，所以用进位后的日期来画图
+        chart_date = curr_dt
+        if chart_date.minute >= 50:
+            chart_date = chart_date + timedelta(minutes=(60 - chart_date.minute))
+
+        today_date = chart_date.date()
+        generate_chart(today_date, CHART_FILE)
     except Exception as e:
         print(f"生成图表失败: {e}")
 
