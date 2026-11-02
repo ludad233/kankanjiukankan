@@ -1,17 +1,15 @@
 name: 自动抓取电力数据
 
 on:
-  schedule:
-    # 每小时的第 59 分钟触发（北京时间）
-    - cron: '59 * * * *'
-  workflow_dispatch:
-  repository_dispatch:  # <--- 允许外部网站（如 cron-job.org）唤醒
+  # 删除了 schedule（避免和 cron-job 撞车）
+  workflow_dispatch:     # 保留手动点击按钮
+  repository_dispatch:   # 保留 cron-job.org 的外部唤醒
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # 允许工作流提交更改回仓库
+      contents: write
 
     steps:
       - name: 拉取代码
