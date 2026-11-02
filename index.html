@@ -9,7 +9,7 @@
     <style>
         body {
             margin: 0;
-            padding: 20px;
+            padding: 10px;
             background-color: #f5f5f5;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             display: flex;
@@ -22,55 +22,58 @@
         }
         .card {
             background: white;
-            padding: 15px;
+            padding: 15px 10px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 20px;
             overflow-x: auto;
         }
-        #chartHeart, #chartPower {
+        
+        /* 隐藏横向滚动条 */
+        .card::-webkit-scrollbar {
+            display: none;
+        }
+
+        .chart-wrapper {
             width: 100%;
-            height: 450px;
+            min-width: 800px;
+            height: 400px;
         }
-        #chartPower {
-            height: 350px;
-        }
+
         .title {
             text-align: center;
             color: #D35400;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
-            margin: 10px 0 20px 0;
+            margin: 10px 0 15px 0;
         }
+        .stats-wrap { text-align: center; margin-bottom: 15px; }
         .stats {
             text-align: center;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             color: #555;
             background: #FDF2E9;
             border: 1px solid #FFB27A;
             border-radius: 20px;
-            padding: 8px 20px;
+            padding: 6px 15px;
             display: inline-block;
-            margin: 0 auto 15px auto;
         }
-        .stats-wrap { text-align: center; margin-bottom: 15px; }
         
-        /* 表格样式 */
-        h2 {
+        /* 表格样式优化，确保手机上清晰可见 */
+        h3 {
             text-align: center;
             color: #333;
-            margin-top: 0;
-            font-size: 18px;
+            margin: 0 0 15px 0;
+            font-size: 16px;
         }
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 14px;
-            white-space: nowrap;
         }
         th, td {
-            padding: 10px 8px;
+            padding: 12px 8px;
             text-align: right;
             border-bottom: 1px solid #eee;
         }
@@ -80,19 +83,18 @@
             font-weight: bold;
             text-align: center;
         }
-        td:first-child {
-            text-align: left;
-            color: #666;
-        }
-        .up { color: #e74c3c; font-weight: bold; }
-        .down { color: #27ae60; font-weight: bold; }
+        td:nth-child(1) { text-align: left; color: #666; font-size: 13px;}
+        td:nth-child(2), td:nth-child(3) { font-weight: bold; }
+        .up { color: #e74c3c; }
+        .down { color: #27ae60; }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- 表格区域（放在图表上面，方便直接看总计） -->
+        
+        <!-- 表格区域：精简版，重点突出 -->
         <div class="card">
-            <h2>实时数据明细</h2>
+            <h3>最近 10 条数据明细</h3>
             <div class="stats-wrap">
                 <div class="stats" id="tableSumStats">昨日增幅总计: 计算中... | 今日增幅总计: 计算中...</div>
             </div>
@@ -100,33 +102,28 @@
                 <thead>
                     <tr>
                         <th>时间</th>
-                        <th>心动人数1</th>
-                        <th>增幅</th>
-                        <th>团建电力1</th>
-                        <th>增幅</th>
-                        <th>总电力值</th>
-                        <th>增幅</th>
+                        <th>心动人数</th>
+                        <th>团建电力</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr><td colspan="7" style="text-align:center;">数据加载中...</td></tr>
+                    <tr><td colspan="3" style="text-align:center;">数据加载中...</td></tr>
                 </tbody>
             </table>
         </div>
 
         <!-- 图表区域 -->
         <div class="card">
-            <div class="title">今天 <span id="todayDate"></span> 本周数据对比</div>
-            <div id="chartHeart"></div>
+            <div class="title">今天 <span id="todayDate"></span> 数据对比</div>
+            <div class="chart-wrapper" id="chartHeart"></div>
         </div>
 
         <div class="card">
-            <div id="chartPower"></div>
+            <div class="chart-wrapper" id="chartPower" style="height: 300px;"></div>
         </div>
     </div>
 
     <script>
-        // 获取当前北京时间
         function getBeijingDate() {
             let d = new Date();
             let utc = d.getTime() + (d.getTimezoneOffset() * 60000);
@@ -148,18 +145,15 @@
             return parts.length > 1 ? parts[1] : str;
         }
 
-        // 格式化数字 (加千分位逗号)
         function formatNum(num) {
             return num ? Number(num).toLocaleString() : '-';
         }
 
-        // 初始化图表
         const chartHeart = echarts.init(document.getElementById('chartHeart'));
         const chartPower = echarts.init(document.getElementById('chartPower'));
         chartHeart.showLoading();
         chartPower.showLoading();
 
-        // 拉取 CSV 数据
         fetch('power_data.csv?t=' + new Date().getTime())
             .then(res => res.text())
             .then(csv => {
@@ -167,7 +161,6 @@
                 const dataMap = {};
                 const datesSet = new Set();
 
-                // 用于统计表格总增幅
                 let yestTotalDelta = 0;
                 let todayTotalDelta = 0;
 
@@ -185,7 +178,7 @@
 
                     if (!dataMap[formattedDate]) dataMap[formattedDate] = {};
                     
-                    const powerDelta = Number(cols[4]) || 0; // 团建电力增幅
+                    const powerDelta = Number(cols[4]) || 0;
 
                     dataMap[formattedDate][timeHour] = {
                         heart: Number(cols[1]) || null,
@@ -196,7 +189,6 @@
                         totalDelta: Number(cols[10]) || null
                     };
 
-                    // 累加总增幅
                     if (formattedDate === todayStr) todayTotalDelta += powerDelta;
                     if (formattedDate === yestStr) yestTotalDelta += powerDelta;
                 });
@@ -204,7 +196,7 @@
                 function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
                 document.getElementById('tableSumStats').innerText = `昨日增幅总计: ${fmtW(yestTotalDelta)} | 今日增幅总计: ${fmtW(todayTotalDelta)}`;
 
-                // --- 1. 渲染最新 10 条表格 ---
+                // --- 渲染极简版表格 ---
                 const dataRows = lines.map(row => row.split(','));
                 const latestRows = dataRows.slice(-10).reverse();
                 const tbody = document.querySelector('#dataTable tbody');
@@ -212,19 +204,17 @@
 
                 latestRows.forEach(row => {
                     const tr = document.createElement('tr');
-                    const indexesToShow = [0, 1, 2, 3, 4, 9, 10]; // 时间、心动、心增幅、电力、电增幅、总电力、总增幅
+                    // 只展示：时间(0), 心动(1), 团建电力(3) 这三列
+                    const indexesToShow = [0, 1, 3]; 
                     
                     indexesToShow.forEach((idx, i) => {
                         const td = document.createElement('td');
                         let val = row[idx] ? row[idx].trim() : '-';
                         
+                        // 如果是数字，加上千分位
                         if (i !== 0 && val !== '-' && val !== '') {
                             if (!isNaN(val)) {
                                 val = formatNum(val);
-                                if (i === 2 || i === 4 || i === 6) {
-                                    if (Number(row[idx]) > 0) td.className = 'up';
-                                    if (Number(row[idx]) < 0) td.className = 'down';
-                                }
                             }
                         }
                         td.textContent = val;
@@ -233,7 +223,7 @@
                     tbody.appendChild(tr);
                 });
 
-                // --- 2. 渲染图表 ---
+                // --- 渲染图表 ---
                 const xAxisHours = [];
                 for (let i = 0; i <= 24; i++) {
                     xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
@@ -248,7 +238,6 @@
                     });
                 }
 
-                // 渲染心动人数
                 const heartSeries = [];
                 activeDates.forEach(date => {
                     if (date === todayStr || date === yestStr) return;
@@ -273,14 +262,13 @@
                 chartHeart.hideLoading();
                 chartHeart.setOption({
                     tooltip: { trigger: 'axis' },
-                    legend: { top: '5%', data: heartSeries.map(s => s.name) },
-                    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-                    xAxis: { type: 'category', boundaryGap: false, data: xAxisHours },
-                    yAxis: { type: 'value', name: '心动人数' },
+                    legend: { top: '0%', data: heartSeries.map(s => s.name) },
+                    grid: { left: '10%', right: '5%', bottom: '10%', top: '20%', containLabel: true },
+                    xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 2 } },
+                    yAxis: { type: 'value', name: '人数', scale: true },
                     series: heartSeries
                 });
 
-                // 渲染电力增幅
                 const powerSeries = [];
                 if (dataMap[yestStr]) {
                     powerSeries.push({
@@ -298,11 +286,11 @@
                 chartPower.hideLoading();
                 chartPower.setOption({
                     tooltip: { trigger: 'axis' },
-                    title: { text: '团建电力值1 增幅对比', left: 'center', top: 10, textStyle: { fontSize: 16, color: '#333' } },
-                    legend: { top: '15%', data: powerSeries.map(s => s.name) },
-                    grid: { left: '3%', right: '4%', top: '25%', bottom: '3%', containLabel: true },
-                    xAxis: { type: 'category', boundaryGap: false, data: xAxisHours },
-                    yAxis: { type: 'value', name: '增幅' },
+                    title: { text: '电力增幅对比', left: 'center', top: 0, textStyle: { fontSize: 14, color: '#333' } },
+                    legend: { top: '10%', data: powerSeries.map(s => s.name) },
+                    grid: { left: '10%', right: '5%', bottom: '10%', top: '30%', containLabel: true },
+                    xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 2 } },
+                    yAxis: { type: 'value', name: '增幅', scale: true },
                     series: powerSeries
                 });
             })
