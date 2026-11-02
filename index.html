@@ -29,6 +29,7 @@
             overflow: hidden;
         }
         
+        /* 顶部日期选择器 */
         .header-bar {
             display: flex;
             justify-content: center;
@@ -48,6 +49,15 @@
             appearance: none;
         }
 
+        /* 表格外层滑动框 */
+        .table-scroll-box {
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table-scroll-box::-webkit-scrollbar { display: none; }
+
+        /* 图表滑动框 */
         .chart-scroll-box {
             width: 100%;
             overflow-x: auto;
@@ -87,15 +97,19 @@
             margin: 0 0 10px 0;
             font-size: 15px;
         }
+
+        /* 表格样式优化 */
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
+            min-width: 600px; /* 强制最小宽度，手机端就可以滑动了 */
         }
         th, td {
-            padding: 8px 4px;
+            padding: 10px 6px;
             text-align: right;
             border-bottom: 1px solid #eee;
+            white-space: nowrap; /* 防止换行 */
         }
         th {
             background-color: #fdf2e9;
@@ -104,8 +118,16 @@
             text-align: center;
             font-size: 12px;
         }
-        td:nth-child(1) { text-align: left; color: #666; font-size: 12px;}
-        td:nth-child(2), td:nth-child(3) { font-weight: bold; }
+        td:nth-child(1) { text-align: left; color: #666; }
+        
+        /* 数字高亮 */
+        .val-heart { font-weight: bold; color: #333; }
+        .val-power { font-weight: bold; color: #333; }
+        .val-total { font-weight: bold; color: #2980b9; } /* 总电力用蓝色高亮 */
+        
+        /* 增幅颜色 */
+        .up { color: #e74c3c; font-weight: bold; }
+        .down { color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -124,18 +146,23 @@
         <!-- 表格区域 -->
         <div class="card">
             <h3 id="tableTitle">数据明细</h3>
-            <table id="dataTable">
-                <thead>
-                    <tr>
-                        <th>时间</th>
-                        <th>心动人数</th>
-                        <th>团建电力</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td colspan="3" style="text-align:center;">数据加载中...</td></tr>
-                </tbody>
-            </table>
+            <div class="table-scroll-box">
+                <table id="dataTable">
+                    <thead>
+                        <tr>
+                            <th>时间</th>
+                            <th>心动人数</th>
+                            <th>心动增幅</th>
+                            <th>团建电力</th>
+                            <th>电力增幅</th>
+                            <th>总电力值</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td colspan="6" style="text-align:center;">数据加载中...</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <!-- 图表区域 -->
@@ -174,6 +201,15 @@
             return num ? Number(num).toLocaleString() : '-';
         }
 
+        // 带颜色格式化的增幅
+        function formatDelta(num) {
+            if (num === null || num === undefined || num === '' || isNaN(num)) return '-';
+            const val = Number(num);
+            if (val > 0) return `<span class="up">+${val.toLocaleString()}</span>`;
+            if (val < 0) return `<span class="down">${val.toLocaleString()}</span>`;
+            return '0';
+        }
+
         const chartHeart = echarts.init(document.getElementById('chartHeart'));
         const chartPower = echarts.init(document.getElementById('chartPower'));
         chartHeart.showLoading();
@@ -205,9 +241,10 @@
 
                     globalDataMap[formattedDate][timeHour] = {
                         heart: Number(cols[1]) || null,
-                        heartDelta: Number(cols[2]) || null,
+                        heartDelta: cols[2] !== '' ? Number(cols[2]) : null,
                         power: Number(cols[3]) || null,
-                        powerDelta: powerDelta
+                        powerDelta: cols[4] !== '' ? Number(cols[4]) : null,
+                        totalPower: Number(cols[9]) || null // 取第10列总电力
                     };
                 });
 
@@ -245,7 +282,7 @@
             prevDateObj.setDate(prevDateObj.getDate() - 1);
             const prevDateStr = prevDateObj.toISOString().split('T')[0];
 
-            // 1. 渲染表格
+            // 1. 渲染总计和表格
             let selectedTotalDelta = 0;
             let prevTotalDelta = 0;
             
@@ -278,14 +315,17 @@
             tbody.innerHTML = '';
 
             if (latestRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">暂无数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">暂无数据</td></tr>';
             } else {
                 latestRows.forEach(row => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td>${row.time}</td>
-                        <td>${formatNum(row.heart)}</td>
-                        <td>${formatNum(row.power)}</td>
+                        <td class="val-heart">${formatNum(row.heart)}</td>
+                        <td>${formatDelta(row.heartDelta)}</td>
+                        <td class="val-power">${formatNum(row.power)}</td>
+                        <td>${formatDelta(row.powerDelta)}</td>
+                        <td class="val-total">${formatNum(row.totalPower)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -297,17 +337,12 @@
                 xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
             }
 
-            // 【修复点1】：修复凌晨断崖式下跌。
-            // 如果原始 CSV 里没有 "00:00" 这个点，但在早上有数据，我们在计算画图时给 Y 轴补个 0，防止连线乱飞。
-            function getSeriesData(date, key, isPower = false) {
+            function getSeriesData(date, key) {
                 return xAxisHours.map(h => {
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
                         return dataMap[date][h][key];
                     }
-                    // 如果某天 0点 没有数据，给它补 0，避免线从中间连过去
-                    if (h === '00:00' && dataMap[date]) {
-                        return 0;
-                    }
+                    if (h === '00:00' && dataMap[date]) return 0;
                     return null;
                 });
             }
@@ -315,14 +350,13 @@
             const heartSeries = [];
             const powerSeries = [];
             
-            // 选中日期（橙）和前一天（粉）
             if (dataMap[selectedDate]) {
                 heartSeries.push({
                     name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'heart'),
                     smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
                 });
                 powerSeries.push({
-                    name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'powerDelta', true),
+                    name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'powerDelta'),
                     smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
                 });
             }
@@ -332,12 +366,11 @@
                     smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
                 });
                 powerSeries.push({
-                    name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'powerDelta', true),
+                    name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'powerDelta'),
                     smooth: true, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
                 });
             }
 
-            // 历史日期灰色虚线
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
@@ -346,9 +379,8 @@
                     smooth: true, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' },
                     emphasis: { disabled: true }
                 });
-                // 【修复点2】：给下面的增幅图表也加上所有历史灰线！
                 powerSeries.push({
-                    name: date.substring(5), type: 'line', data: getSeriesData(date, 'powerDelta', true),
+                    name: date.substring(5), type: 'line', data: getSeriesData(date, 'powerDelta'),
                     smooth: true, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' },
                     emphasis: { disabled: true }
                 });
