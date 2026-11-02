@@ -7,23 +7,155 @@
     <style>
         body {
             margin: 0;
-            padding: 0;
+            padding: 20px;
             background-color: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
             align-items: center;
-            min-height: 100vh;
         }
-        img {
+        .container {
+            width: 100%;
+            max-width: 1200px; /* 控制最大宽度 */
+        }
+        .chart-box {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .chart-box img {
             max-width: 100%;
             height: auto;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
             border-radius: 8px;
         }
+        .table-box {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow-x: auto; /* 防止表格太宽撑破页面 */
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        th, td {
+            padding: 10px 8px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #fdf2e9;
+            color: #d35400;
+            font-weight: bold;
+            text-align: center;
+        }
+        td:first-child {
+            text-align: left; /* 时间列靠左 */
+            color: #666;
+        }
+        /* 给增幅加上颜色 */
+        .up { color: #e74c3c; font-weight: bold; }
+        .down { color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
-    <!-- 这里的图片路径就是你生成的对比图文件名 -->
-    <img src="comparison_chart.png" alt="数据加载中...">
+    <div class="container">
+        <!-- 图表区域 -->
+        <div class="chart-box">
+            <!-- 加上时间戳参数，防止浏览器缓存旧图片 -->
+            <img id="mainChart" src="comparison_chart.png" alt="图表加载中...">
+        </div>
+
+        <!-- 表格区域 -->
+        <div class="table-box">
+            <h2>最新 10 条数据明细</h2>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>心动人数1</th>
+                        <th>增幅</th>
+                        <th>团建电力1</th>
+                        <th>增幅</th>
+                        <th>总电力值</th>
+                        <th>增幅</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="7" style="text-align:center;">数据加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 1. 每次刷新网页时，强制更新图片（加个随机参数）
+        document.getElementById('mainChart').src = 'comparison_chart.png?t=' + new Date().getTime();
+
+        // 2. 读取 CSV 并展示最后 10 条
+        async function loadLatestData() {
+            try {
+                // 请求最新的 CSV 文件（加时间戳防止缓存）
+                const response = await fetch('power_data.csv?t=' + new Date().getTime());
+                if (!response.ok) throw new Error('网络请求失败');
+                const csvText = await response.text();
+                
+                // 解析 CSV
+                const rows = csvText.trim().split('\n').map(row => row.split(','));
+                if (rows.length <= 1) return;
+
+                const headers = rows[0];
+                const dataRows = rows.slice(1);
+                
+                // 取最后 10 条，并反转顺序（最新的在最上面）
+                const latestRows = dataRows.slice(-10).reverse();
+                
+                const tbody = document.querySelector('#dataTable tbody');
+                tbody.innerHTML = ''; // 清空加载中提示
+
+                latestRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    
+                    // 我们只取 0, 1, 2, 3, 4, 9, 10 列（对应时间、心动1、心动1增幅、电力1、电力1增幅、总电力、总电力增幅）
+                    const indexesToShow = [0, 1, 2, 3, 4, 9, 10];
+                    
+                    indexesToShow.forEach((idx, i) => {
+                        const td = document.createElement('td');
+                        let val = row[idx] ? row[idx].trim() : '-';
+                        
+                        // 如果是数字，加上千分位逗号
+                        if (i !== 0 && val !== '-' && val !== '') {
+                            if (!isNaN(val)) {
+                                val = Number(val).toLocaleString();
+                                // 给增幅上色
+                                if (i === 2 || i === 4 || i === 6) {
+                                    if (Number(row[idx]) > 0) td.className = 'up';
+                                    if (Number(row[idx]) < 0) td.className = 'down';
+                                }
+                            }
+                        }
+                        td.textContent = val;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                console.error('获取数据失败:', error);
+                document.querySelector('#dataTable tbody').innerHTML = '<tr><td colspan="7" style="text-align:center; color:red;">获取数据失败，请稍后刷新</td></tr>';
+            }
+        }
+
+        // 页面加载时执行
+        loadLatestData();
+    </script>
 </body>
 </html>
