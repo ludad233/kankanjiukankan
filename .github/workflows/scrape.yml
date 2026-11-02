@@ -38,4 +38,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "自动更新数据"
-          file_pattern: "power_data.csv comparison_chart.png"
+          # 这里把所有需要提交的文件都包含进去了，包括新增的 history 文件夹
+          file_pattern: "power_data.csv comparison_chart.png history/*.png"
