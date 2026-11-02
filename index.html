@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>坎坎吉乌坎坎 - 实时战况</title>
-    <!-- 引入 ECharts 图表库（使用国内极速 CDN） -->
-    <script src="https://cdn.staticfile.org/echarts/5.4.3/echarts.min.js"></script>
     <style>
         body {
             margin: 0;
@@ -18,21 +16,23 @@
         }
         .container {
             width: 100%;
-            max-width: 1100px;
+            max-width: 1200px; /* 控制最大宽度 */
         }
-        .card {
+        .chart-box {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .chart-box img {
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            border-radius: 8px;
+        }
+        .table-box {
             background: white;
             padding: 20px;
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        /* 图表容器必须指定高度 */
-        #heartChart, #powerChart {
-            width: 100%;
-            height: 400px;
-        }
-        .table-box {
             overflow-x: auto; /* 防止表格太宽撑破页面 */
         }
         h2 {
@@ -59,9 +59,10 @@
             text-align: center;
         }
         td:first-child {
-            text-align: left;
+            text-align: left; /* 时间列靠左 */
             color: #666;
         }
+        /* 给增幅加上颜色 */
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
     </style>
@@ -69,15 +70,13 @@
 <body>
     <div class="container">
         <!-- 图表区域 -->
-        <div class="card">
-            <div id="heartChart"></div>
-        </div>
-        <div class="card">
-            <div id="powerChart"></div>
+        <div class="chart-box">
+            <!-- 加上时间戳参数，防止浏览器缓存旧图片 -->
+            <img id="mainChart" src="comparison_chart.png" alt="图表加载中...">
         </div>
 
         <!-- 表格区域 -->
-        <div class="card table-box">
+        <div class="table-box">
             <h2>最新 10 条数据明细</h2>
             <table id="dataTable">
                 <thead>
@@ -99,103 +98,45 @@
     </div>
 
     <script>
-        // 初始化图表实例
-        const heartChart = echarts.init(document.getElementById('heartChart'));
-        const powerChart = echarts.init(document.getElementById('powerChart'));
+        // 1. 每次刷新网页时，强制更新图片（加个随机参数）
+        document.getElementById('mainChart').src = 'comparison_chart.png?t=' + new Date().getTime();
 
-        // 显示正在加载的提示
-        heartChart.showLoading({ text: '正在拉取数据...', color: '#d35400' });
-        powerChart.showLoading({ text: '正在拉取数据...', color: '#d35400' });
-
-        async function fetchDataAndRender() {
+        // 2. 读取 CSV 并展示最后 10 条
+        async function loadLatestData() {
             try {
-                // 读取 CSV 数据（加上时间戳防缓存）
+                // 请求最新的 CSV 文件（加时间戳防止缓存）
                 const response = await fetch('power_data.csv?t=' + new Date().getTime());
+                if (!response.ok) throw new Error('网络请求失败');
                 const csvText = await response.text();
                 
                 // 解析 CSV
                 const rows = csvText.trim().split('\n').map(row => row.split(','));
-                const dataRows = rows.slice(1); // 去掉表头
+                if (rows.length <= 1) return;
 
-                if (dataRows.length === 0) throw new Error('没有数据');
-
-                // 提取今天的数据画折线图（假设最后一天就是今天）
-                const lastDateStr = dataRows[dataRows.length - 1][0].split(' ')[0];
-                const todayData = dataRows.filter(r => r[0].startsWith(lastDateStr));
-
-                const times = [];
-                const hearts = [];
-                const powers = [];
-
-                todayData.forEach(row => {
-                    const timeStr = row[0].split(' ')[1];
-                    times.push(timeStr);
-                    
-                    // 清理数据，处理空值
-                    hearts.push(row[1] ? Number(row[1]) : null);
-                    powers.push(row[3] ? Number(row[3]) : null);
-                });
-
-                // ---- 渲染心动人数图表 ----
-                heartChart.hideLoading();
-                heartChart.setOption({
-                    title: { text: '今日心动人数趋势', left: 'center', textStyle: { color: '#333' } },
-                    tooltip: { trigger: 'axis' },
-                    xAxis: { type: 'category', data: times, boundaryGap: false },
-                    yAxis: { type: 'value', scale: true },
-                    series: [{
-                        name: '心动人数',
-                        data: hearts,
-                        type: 'line',
-                        smooth: true,
-                        itemStyle: { color: '#FF8C42' },
-                        areaStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: 'rgba(255,140,66,0.5)' },
-                                { offset: 1, color: 'rgba(255,140,66,0)' }
-                            ])
-                        }
-                    }]
-                });
-
-                // ---- 渲染团建电力图表 ----
-                powerChart.hideLoading();
-                powerChart.setOption({
-                    title: { text: '今日团建电力值趋势', left: 'center', textStyle: { color: '#333' } },
-                    tooltip: { trigger: 'axis' },
-                    xAxis: { type: 'category', data: times, boundaryGap: false },
-                    yAxis: { type: 'value', scale: true },
-                    series: [{
-                        name: '团建电力值',
-                        data: powers,
-                        type: 'line',
-                        smooth: true,
-                        itemStyle: { color: '#FFB3C6' },
-                        areaStyle: {
-                            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                                { offset: 0, color: 'rgba(255,179,198,0.5)' },
-                                { offset: 1, color: 'rgba(255,179,198,0)' }
-                            ])
-                        }
-                    }]
-                });
-
-                // ---- 渲染表格（最新 10 条） ----
+                const headers = rows[0];
+                const dataRows = rows.slice(1);
+                
+                // 取最后 10 条，并反转顺序（最新的在最上面）
                 const latestRows = dataRows.slice(-10).reverse();
+                
                 const tbody = document.querySelector('#dataTable tbody');
-                tbody.innerHTML = '';
+                tbody.innerHTML = ''; // 清空加载中提示
 
                 latestRows.forEach(row => {
                     const tr = document.createElement('tr');
+                    
+                    // 我们只取 0, 1, 2, 3, 4, 9, 10 列（对应时间、心动1、心动1增幅、电力1、电力1增幅、总电力、总电力增幅）
                     const indexesToShow = [0, 1, 2, 3, 4, 9, 10];
                     
                     indexesToShow.forEach((idx, i) => {
                         const td = document.createElement('td');
                         let val = row[idx] ? row[idx].trim() : '-';
                         
+                        // 如果是数字，加上千分位逗号
                         if (i !== 0 && val !== '-' && val !== '') {
                             if (!isNaN(val)) {
                                 val = Number(val).toLocaleString();
+                                // 给增幅上色
                                 if (i === 2 || i === 4 || i === 6) {
                                     if (Number(row[idx]) > 0) td.className = 'up';
                                     if (Number(row[idx]) < 0) td.className = 'down';
@@ -207,23 +148,14 @@
                     });
                     tbody.appendChild(tr);
                 });
-
             } catch (error) {
-                console.error(error);
-                heartChart.hideLoading();
-                powerChart.hideLoading();
-                alert('数据加载失败，请稍后刷新网页');
+                console.error('获取数据失败:', error);
+                document.querySelector('#dataTable tbody').innerHTML = '<tr><td colspan="7" style="text-align:center; color:red;">获取数据失败，请稍后刷新</td></tr>';
             }
         }
 
-        // 执行加载
-        fetchDataAndRender();
-
-        // 窗口大小改变时，图表自动适配
-        window.addEventListener('resize', () => {
-            heartChart.resize();
-            powerChart.resize();
-        });
+        // 页面加载时执行
+        loadLatestData();
     </script>
 </body>
 </html>
