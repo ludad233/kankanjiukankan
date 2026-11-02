@@ -16,16 +16,18 @@
             align-items: center;
             overflow-x: hidden;
         }
+        /* 统一所有卡片的宽度 */
         .container {
             width: 100%;
-            max-width: 900px; /* 【修改】将整个容器宽度限制为 900px，与图表对齐 */
+            max-width: 900px; 
         }
         .card {
             background: white;
-            padding: 12px 8px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 12px;
+            /* 去掉左右 padding，让内容顶格，保持绝对同宽 */
+            padding: 12px 0; 
             overflow: hidden;
         }
         
@@ -67,7 +69,7 @@
         .chart-scroll-box::-webkit-scrollbar { display: none; }
 
         .chart-wrapper {
-            width: 900px; /* 与容器同宽 */
+            width: 100%;
             height: 350px;
         }
 
@@ -103,11 +105,10 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            min-width: 800px;
-            table-layout: fixed; /* 强制均分列宽，视觉更整齐 */
+            table-layout: fixed; /* 强制均分列宽 */
         }
         th, td {
-            padding: 12px 10px; /* 增加内边距让表格看起来更饱满 */
+            padding: 10px 4px;
             text-align: right;
             border-bottom: 1px solid #eee;
             white-space: nowrap;
@@ -119,16 +120,19 @@
             text-align: center;
             font-size: 12px;
         }
-        /* 各列宽度分配 */
-        th:nth-child(1) { width: 12%; text-align: left; }
-        th:nth-child(2) { width: 14%; }
+        
+        /* 给表格左右两端留出和图表坐标轴一样的边距 */
+        th:first-child, td:first-child { padding-left: 16px; text-align: left; color: #666; }
+        th:last-child, td:last-child { padding-right: 16px; }
+
+        /* 各列宽度分配，让数字不被挤变形 */
+        th:nth-child(1) { width: 12%; }
+        th:nth-child(2) { width: 13%; }
         th:nth-child(3) { width: 14%; }
         th:nth-child(4) { width: 16%; }
         th:nth-child(5) { width: 14%; }
-        th:nth-child(6) { width: 16%; }
+        th:nth-child(6) { width: 17%; }
         th:nth-child(7) { width: 14%; }
-        
-        td:nth-child(1) { text-align: left; color: #666; }
         
         /* 数字高亮 */
         .val-heart { font-weight: bold; color: #333; }
@@ -404,10 +408,12 @@
             });
 
             chartHeart.hideLoading();
+            // 将图表设为与容器一致
             chartHeart.setOption({
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
+                // grid 调整成左右 0% 铺满，靠 containLabel 留白，以对齐表格
+                grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: { type: 'value', name: '人数', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
                 series: heartSeries
@@ -417,7 +423,7 @@
             chartPower.setOption({
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
+                grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: { type: 'value', name: '增幅', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 1000000 ? (v / 1000000).toFixed(1) + 'm' : v; } } },
                 series: powerSeries
