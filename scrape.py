@@ -19,7 +19,6 @@ URL_TEAM2 = None
 URL_POWER = "https://y.qq.com/tmead/promotion/h5/powering/1793152992875?_hidehd=1&_miniplayer=1&adtag=share_task&singerId=6665073&p_share=w2pZEizuC5V-xTHRIivoTwD_5f_DMRfGNgTtS7isP_4&hosteuin=oiEqow6FoiCA7n**&ADTAG=wxfshare"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# 【修改点 1】改成英文文件名
 CSV_FILE = os.path.join(BASE_DIR, "power_data.csv")
 CHART_FILE = os.path.join(BASE_DIR, "comparison_chart.png")
 
@@ -94,6 +93,7 @@ def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
+    # 【修改点 1】：判断条件改为 minute >= 55
     if curr_dt.hour == 23 and curr_dt.minute >= 55:
         curr_hour_str = fmt_no_pad(curr_dt.replace(hour=23))
         prev_hour_str = fmt_no_pad(curr_dt.replace(hour=22))
@@ -113,9 +113,10 @@ def append_csv(row_dict):
     header, all_rows = load_all_rows()
     curr_dt = datetime.strptime(row_dict["时间"], "%Y-%m-%d %H:%M:%S")
 
+    # 【修改点 2】：把 23:55 及以后的数据统一标记为 23:55，并用于计算最终增幅
     if curr_dt.hour == 23 and curr_dt.minute >= 55:
-        formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} 23:59"
-        curr_dt = curr_dt.replace(hour=23, minute=59)
+        formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} 23:55"
+        curr_dt = curr_dt.replace(hour=23, minute=55)
     else:
         formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} {curr_dt.hour:02d}:{curr_dt.minute:02d}"
 
@@ -188,9 +189,10 @@ def generate_chart(target_date, save_path, is_final=False):
             data_map[f"{target_date_str}_0"] = rec
             continue
 
+        # 【修改点 3】：匹配 55 分及以后的数据
         if dt.hour == 23 and dt.minute >= 55:
             next_day_str = (dt + timedelta(days=1)).strftime('%Y-%m-%d')
-            data_map[f"{next_day_str}_0_2359"] = rec
+            data_map[f"{next_day_str}_0_2355"] = rec  # 键名标记为 2355
             data_map.setdefault(f"{target_date_str}_23", rec)
             continue
 
@@ -227,7 +229,7 @@ def generate_chart(target_date, save_path, is_final=False):
         if h == 0:
             rec = data_map.get(f"{today_str}_0")
         elif h == 24:
-            rec = data_map.get(f"{next_str}_0_2359") or data_map.get(f"{next_str}_0")
+            rec = data_map.get(f"{next_str}_0_2355") or data_map.get(f"{next_str}_0")
         else:
             rec = data_map.get(f"{today_str}_{h}")
         if rec and rec["delta"] is not None:
@@ -238,7 +240,7 @@ def generate_chart(target_date, save_path, is_final=False):
         if h == 0:
             rec = data_map.get(f"{yest_str}_0")
         elif h == 24:
-            rec = data_map.get(f"{today_str}_0_2359") or data_map.get(f"{today_str}_0")
+            rec = data_map.get(f"{today_str}_0_2355") or data_map.get(f"{today_str}_0")
         else:
             rec = data_map.get(f"{yest_str}_{h}")
         if rec and rec["delta"] is not None:
@@ -263,7 +265,7 @@ def generate_chart(target_date, save_path, is_final=False):
                 rec = data_map.get(f"{d_str}_0")
             elif h == 24:
                 next_key = (datetime.strptime(d_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-                rec = data_map.get(f"{next_key}_0_2359") or data_map.get(f"{next_key}_0")
+                rec = data_map.get(f"{next_key}_0_2355") or data_map.get(f"{next_key}_0")
             else:
                 rec = data_map.get(f"{d_str}_{h}")
 
@@ -278,8 +280,8 @@ def generate_chart(target_date, save_path, is_final=False):
             y_data = data_map.get(f"{yest_str}_0")
             t_data = data_map.get(f"{today_str}_0")
         elif h == 24:
-            y_data = data_map.get(f"{today_str}_0_2359") or data_map.get(f"{today_str}_0")
-            t_data = data_map.get(f"{next_str}_0_2359") or data_map.get(f"{next_str}_0")
+            y_data = data_map.get(f"{today_str}_0_2355") or data_map.get(f"{today_str}_0")
+            t_data = data_map.get(f"{next_str}_0_2355") or data_map.get(f"{next_str}_0")
         else:
             y_data = data_map.get(f"{yest_str}_{h}")
             t_data = data_map.get(f"{today_str}_{h}")
@@ -308,7 +310,7 @@ def generate_chart(target_date, save_path, is_final=False):
             if h == 0:
                 t_data = data_map.get(f"{today_str}_0")
             elif h == 24:
-                t_data = data_map.get(f"{next_str}_0_2359") or data_map.get(f"{next_str}_0")
+                t_data = data_map.get(f"{next_str}_0_2355") or data_map.get(f"{next_str}_0")
             else:
                 t_data = data_map.get(f"{today_str}_{h}")
 
@@ -349,7 +351,7 @@ def generate_chart(target_date, save_path, is_final=False):
 
             if h == 24:
                 next_key = (datetime.strptime(d_str, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
-                rec = data_map.get(f"{next_key}_0_2359") or data_map.get(f"{next_key}_0")
+                rec = data_map.get(f"{next_key}_0_2355") or data_map.get(f"{next_key}_0")
             else:
                 rec = data_map.get(f"{d_str}_{h}")
 
