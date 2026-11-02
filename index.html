@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>坎坎吉乌坎坎 - 实时战况</title>
-    <!-- 引入 ECharts 库，极速 CDN 节点 -->
+    <!-- 引入 ECharts 库 -->
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         body {
@@ -26,8 +26,8 @@
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 20px;
+            overflow-x: auto;
         }
-        /* 图表容器 */
         #chartHeart, #chartPower {
             width: 100%;
             height: 450px;
@@ -54,28 +54,79 @@
             display: inline-block;
             margin: 0 auto 15px auto;
         }
-        .stats-wrap { text-align: center; }
+        .stats-wrap { text-align: center; margin-bottom: 15px; }
+        
+        /* 表格样式 */
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-top: 0;
+            font-size: 18px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        th, td {
+            padding: 10px 8px;
+            text-align: right;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #fdf2e9;
+            color: #d35400;
+            font-weight: bold;
+            text-align: center;
+        }
+        td:first-child {
+            text-align: left;
+            color: #666;
+        }
+        .up { color: #e74c3c; font-weight: bold; }
+        .down { color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- 表格区域（放在图表上面，方便直接看总计） -->
+        <div class="card">
+            <h2>实时数据明细</h2>
+            <div class="stats-wrap">
+                <div class="stats" id="tableSumStats">昨日增幅总计: 计算中... | 今日增幅总计: 计算中...</div>
+            </div>
+            <table id="dataTable">
+                <thead>
+                    <tr>
+                        <th>时间</th>
+                        <th>心动人数1</th>
+                        <th>增幅</th>
+                        <th>团建电力1</th>
+                        <th>增幅</th>
+                        <th>总电力值</th>
+                        <th>增幅</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="7" style="text-align:center;">数据加载中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 图表区域 -->
         <div class="card">
             <div class="title">今天 <span id="todayDate"></span> 本周数据对比</div>
-            <div class="stats-wrap">
-                <div class="stats" id="sumStats">昨日增幅总和: 计算中... | 今日增幅总和: 计算中...</div>
-            </div>
-            <!-- 心动人数图表 -->
             <div id="chartHeart"></div>
         </div>
 
         <div class="card">
-            <!-- 电力增幅图表 -->
             <div id="chartPower"></div>
         </div>
     </div>
 
     <script>
-        // 获取当前北京时间（用于计算“今天”是哪一天）
+        // 获取当前北京时间
         function getBeijingDate() {
             let d = new Date();
             let utc = d.getTime() + (d.getTimezoneOffset() * 60000);
@@ -91,36 +142,41 @@
         
         document.getElementById('todayDate').innerText = todayStr;
 
-        // 解析时间 "2026/11/2 19:00" -> 变成 "19:00"
         function parseTimeStr(str) {
             if (!str) return "";
             let parts = str.split(' ');
             return parts.length > 1 ? parts[1] : str;
         }
 
-        // 初始化图表实例
+        // 格式化数字 (加千分位逗号)
+        function formatNum(num) {
+            return num ? Number(num).toLocaleString() : '-';
+        }
+
+        // 初始化图表
         const chartHeart = echarts.init(document.getElementById('chartHeart'));
         const chartPower = echarts.init(document.getElementById('chartPower'));
-
-        // 显示加载动画
         chartHeart.showLoading();
         chartPower.showLoading();
 
-        // 拉取最新 CSV 数据
+        // 拉取 CSV 数据
         fetch('power_data.csv?t=' + new Date().getTime())
             .then(res => res.text())
             .then(csv => {
-                const lines = csv.trim().split('\n').slice(1); // 去掉表头
-                const dataMap = {}; // 按日期归类数据
+                const lines = csv.trim().split('\n').slice(1);
+                const dataMap = {};
                 const datesSet = new Set();
+
+                // 用于统计表格总增幅
+                let yestTotalDelta = 0;
+                let todayTotalDelta = 0;
 
                 lines.forEach(line => {
                     const cols = line.split(',');
                     if (cols.length < 10) return;
                     
-                    const timeStr = cols[0].trim(); // 例如: 2026/11/2 19:00
-                    const datePart = timeStr.split(' ')[0].replace(/\//g, '-'); // 2026-11-2
-                    // 标准化日期格式为 YYYY-MM-DD
+                    const timeStr = cols[0].trim();
+                    const datePart = timeStr.split(' ')[0].replace(/\//g, '-');
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
@@ -129,87 +185,91 @@
 
                     if (!dataMap[formattedDate]) dataMap[formattedDate] = {};
                     
+                    const powerDelta = Number(cols[4]) || 0; // 团建电力增幅
+
                     dataMap[formattedDate][timeHour] = {
                         heart: Number(cols[1]) || null,
                         heartDelta: Number(cols[2]) || null,
                         power: Number(cols[3]) || null,
-                        powerDelta: Number(cols[4]) || null
+                        powerDelta: powerDelta,
+                        totalPower: Number(cols[9]) || null,
+                        totalDelta: Number(cols[10]) || null
                     };
+
+                    // 累加总增幅
+                    if (formattedDate === todayStr) todayTotalDelta += powerDelta;
+                    if (formattedDate === yestStr) yestTotalDelta += powerDelta;
                 });
 
-                // 生成 0-24 小时的时间轴
+                function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
+                document.getElementById('tableSumStats').innerText = `昨日增幅总计: ${fmtW(yestTotalDelta)} | 今日增幅总计: ${fmtW(todayTotalDelta)}`;
+
+                // --- 1. 渲染最新 10 条表格 ---
+                const dataRows = lines.map(row => row.split(','));
+                const latestRows = dataRows.slice(-10).reverse();
+                const tbody = document.querySelector('#dataTable tbody');
+                tbody.innerHTML = '';
+
+                latestRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    const indexesToShow = [0, 1, 2, 3, 4, 9, 10]; // 时间、心动、心增幅、电力、电增幅、总电力、总增幅
+                    
+                    indexesToShow.forEach((idx, i) => {
+                        const td = document.createElement('td');
+                        let val = row[idx] ? row[idx].trim() : '-';
+                        
+                        if (i !== 0 && val !== '-' && val !== '') {
+                            if (!isNaN(val)) {
+                                val = formatNum(val);
+                                if (i === 2 || i === 4 || i === 6) {
+                                    if (Number(row[idx]) > 0) td.className = 'up';
+                                    if (Number(row[idx]) < 0) td.className = 'down';
+                                }
+                            }
+                        }
+                        td.textContent = val;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+
+                // --- 2. 渲染图表 ---
                 const xAxisHours = [];
                 for (let i = 0; i <= 24; i++) {
                     xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
                 }
 
-                // 找出过去 6 天的日期，并加上今天和昨天
                 const sortedDates = Array.from(datesSet).sort();
-                const activeDates = sortedDates.filter(d => d >= '2026-11-01').slice(-6); // 最多展示过去几天
+                const activeDates = sortedDates.filter(d => d >= '2026-11-01').slice(-6);
 
-                // 生成曲线数据 (缺失的点用 null 填补，ECharts 会断开连线)
-                function getSeriesData(date, key, isHeart = true) {
+                function getSeriesData(date, key) {
                     return xAxisHours.map(h => {
-                        if (h === '00:00' && date === todayStr && dataMap[date] && dataMap[date]['00:00']) {
-                            // 今天的 0 点特殊处理
-                        }
                         return dataMap[date] && dataMap[date][h] ? dataMap[date][h][key] : null;
                     });
                 }
 
-                // 计算增幅总和
-                let yestTotalDelta = 0;
-                let todayTotalDelta = 0;
-                xAxisHours.forEach(h => {
-                    if (dataMap[yestStr] && dataMap[yestStr][h] && dataMap[yestStr][h].powerDelta) yestTotalDelta += dataMap[yestStr][h].powerDelta;
-                    if (dataMap[todayStr] && dataMap[todayStr][h] && dataMap[todayStr][h].powerDelta) todayTotalDelta += dataMap[todayStr][h].powerDelta;
-                });
-                
-                function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
-                document.getElementById('sumStats').innerText = `昨日增幅总和: ${fmtW(yestTotalDelta)} | 今日增幅总和: ${fmtW(todayTotalDelta)}`;
-
-                // 生成心动人数图表配置
+                // 渲染心动人数
                 const heartSeries = [];
-                // 添加灰色虚线背景
                 activeDates.forEach(date => {
-                    if (date === todayStr || date === yestStr) return; // 跳过今天和昨天
+                    if (date === todayStr || date === yestStr) return;
                     heartSeries.push({
-                        name: date,
-                        type: 'line',
-                        data: getSeriesData(date, 'heart'),
-                        smooth: true,
-                        symbol: 'none',
-                        lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' }
+                        name: date, type: 'line', data: getSeriesData(date, 'heart'),
+                        smooth: true, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' }
                     });
                 });
-                // 添加昨天（粉色）
                 if (dataMap[yestStr]) {
                     heartSeries.push({
-                        name: '昨天 (' + yestStr + ')',
-                        type: 'line',
-                        data: getSeriesData(yestStr, 'heart'),
-                        smooth: true,
-                        symbol: 'circle',
-                        symbolSize: 6,
-                        itemStyle: { color: '#FFB3C6' },
-                        lineStyle: { color: '#FFB3C6', width: 2 }
+                        name: '昨天', type: 'line', data: getSeriesData(yestStr, 'heart'),
+                        smooth: true, symbol: 'circle', itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
                     });
                 }
-                // 添加今天（橙色）
                 if (dataMap[todayStr]) {
                     heartSeries.push({
-                        name: '今天 (' + todayStr + ')',
-                        type: 'line',
-                        data: getSeriesData(todayStr, 'heart'),
-                        smooth: true,
-                        symbol: 'circle',
-                        symbolSize: 6,
-                        itemStyle: { color: '#FF8C42' },
-                        lineStyle: { color: '#FF8C42', width: 3 }
+                        name: '今天', type: 'line', data: getSeriesData(todayStr, 'heart'),
+                        smooth: true, symbol: 'circle', itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 3 }
                     });
                 }
 
-                // 渲染心动人数图
                 chartHeart.hideLoading();
                 chartHeart.setOption({
                     tooltip: { trigger: 'axis' },
@@ -220,32 +280,21 @@
                     series: heartSeries
                 });
 
-                // 生成电力增幅图表配置 (只画昨天和今天)
+                // 渲染电力增幅
                 const powerSeries = [];
                 if (dataMap[yestStr]) {
                     powerSeries.push({
-                        name: '昨天增幅',
-                        type: 'line',
-                        data: getSeriesData(yestStr, 'powerDelta'),
-                        smooth: true,
-                        symbol: 'circle',
-                        itemStyle: { color: '#FFB3C6' },
-                        lineStyle: { color: '#FFB3C6', width: 2 }
+                        name: '昨天增幅', type: 'line', data: getSeriesData(yestStr, 'powerDelta'),
+                        smooth: true, symbol: 'circle', itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
                     });
                 }
                 if (dataMap[todayStr]) {
                     powerSeries.push({
-                        name: '今天增幅',
-                        type: 'line',
-                        data: getSeriesData(todayStr, 'powerDelta'),
-                        smooth: true,
-                        symbol: 'circle',
-                        itemStyle: { color: '#FF8C42' },
-                        lineStyle: { color: '#FF8C42', width: 3 }
+                        name: '今天增幅', type: 'line', data: getSeriesData(todayStr, 'powerDelta'),
+                        smooth: true, symbol: 'circle', itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 3 }
                     });
                 }
 
-                // 渲染电力增幅图
                 chartPower.hideLoading();
                 chartPower.setOption({
                     tooltip: { trigger: 'axis' },
@@ -259,10 +308,9 @@
             })
             .catch(err => {
                 console.error('数据加载失败:', err);
-                document.getElementById('sumStats').innerText = '数据加载失败，请刷新重试';
+                document.getElementById('tableSumStats').innerText = '数据加载失败，请刷新重试';
             });
 
-        // 让图表随窗口大小自适应
         window.addEventListener('resize', function() {
             chartHeart.resize();
             chartPower.resize();
