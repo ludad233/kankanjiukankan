@@ -44,7 +44,6 @@
         .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .table-scroll-box::-webkit-scrollbar { display: none; }
         
-        /* 图表宽度 100% 自适应 */
         .chart-wrapper { width: 100%; height: 350px; }
         
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
@@ -63,6 +62,12 @@
         
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
+        
+        /* 自定义 Tooltip 样式 */
+        .custom-tooltip-title { font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #333; }
+        .custom-tooltip-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 13px; color: #666; }
+        .custom-tooltip-val { font-weight: bold; color: #333; margin-left: 10px; }
+        .custom-tooltip-delta { margin-left: 6px; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -335,15 +340,57 @@
 
             chartHeart.hideLoading();
             chartHeart.setOption({
-                tooltip: { trigger: 'axis', confine: true },
-                // 移除 dataZoom，展示完整的一天
+                tooltip: { 
+                    trigger: 'axis', 
+                    confine: true,
+                    // 恢复带增幅的自定义提示框
+                    formatter: function (params) {
+                        let timeStr = params[0].axisValue;
+                        let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
+                        
+                        params.forEach(p => {
+                            let valStr = p.value !== null ? Number(p.value).toLocaleString() : '-';
+                            let deltaVal = '';
+                            
+                            let dateStr = selectedDate;
+                            if(p.seriesName.includes(prevDateStr.substring(5))) dateStr = prevDateStr;
+                            
+                            let dataObj = dataMap[dateStr] && dataMap[dateStr][timeStr];
+                            
+                            if (dataObj) {
+                                if (p.seriesName.includes('心动') && !p.seriesName.includes('总人数')) {
+                                    if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
+                                    }
+                                } else if (p.seriesName.includes('总人数')) {
+                                    if (dataObj.peopleDelta !== null && dataObj.peopleDelta !== undefined) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.peopleDelta.toLocaleString()}</span>`;
+                                    }
+                                }
+                            }
+                            
+                            html += `
+                                <div class="custom-tooltip-item">
+                                    <div style="display:flex; align-items:center;">
+                                        ${p.marker}
+                                        <span style="margin-left:4px;">${p.seriesName}</span>
+                                    </div>
+                                    <div>
+                                        <span class="custom-tooltip-val">${valStr}</span>
+                                        ${deltaVal}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        return html;
+                    }
+                },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
                 xAxis: { 
                     type: 'category', 
                     boundaryGap: false, 
                     data: xAxisHours, 
-                    // 【核心修改】把 interval 改成 3，每隔 3 小时显示一个刻度，这样手机绝对不会重叠
                     axisLabel: { interval: 3, fontSize: 10 } 
                 },
                 yAxis: [
