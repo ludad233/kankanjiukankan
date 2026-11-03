@@ -22,11 +22,20 @@
             border: 1px solid #FFB27A; border-radius: 8px; padding: 8px 12px; outline: none; appearance: none;
         }
         
+        /* 恢复的总增幅胶囊样式 */
+        .stats-wrap { text-align: center; margin-bottom: 5px; padding: 0 10px; }
+        .stats {
+            text-align: center; font-size: 13px; font-weight: bold; color: #555;
+            background: #FDF2E9; border: 1px solid #FFB27A; border-radius: 20px;
+            padding: 6px 15px; display: inline-block; line-height: 1.4;
+            box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
+        }
+
         .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .table-scroll-box::-webkit-scrollbar { display: none; }
         .chart-scroll-box { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         .chart-scroll-box::-webkit-scrollbar { display: none; }
-        .chart-wrapper { width: 900px; height: 380px; }
+        .chart-wrapper { width: 900px; height: 350px; }
         
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
         h3 { text-align: center; color: #333; margin: 0 0 10px 0; font-size: 15px; }
@@ -52,6 +61,10 @@
             <div class="header-bar">
                 <span>选择查看日期：</span>
                 <select id="dateSelector" class="date-select"></select>
+            </div>
+            <!-- 恢复的增幅总计显示区 -->
+            <div class="stats-wrap">
+                <div class="stats" id="tableSumStats">总计计算中...</div>
             </div>
         </div>
 
@@ -82,13 +95,13 @@
 
         <!-- 图表区域 -->
         <div class="card">
-            <div class="title">心动人数 & 增幅 (👈左右滑动👉)</div>
+            <div class="title">心动人数 & 总人数 (👈左右滑动👉)</div>
             <div class="chart-scroll-box"><div class="chart-wrapper" id="chartHeart"></div></div>
         </div>
 
         <div class="card">
-            <div class="title">团建电力 & 增幅 (👈左右滑动👉)</div>
-            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 320px;"></div></div>
+            <div class="title">团建电力增幅趋势 (👈左右滑动👉)</div>
+            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 300px;"></div></div>
         </div>
     </div>
 
@@ -114,6 +127,11 @@
             if (val > 0) return `<span class="up">+${val.toLocaleString()}</span>`;
             if (val < 0) return `<span class="down">${val.toLocaleString()}</span>`;
             return '0';
+        }
+
+        function fmtW(v) {
+            if (v === null || v === undefined || isNaN(v)) return "0w";
+            return (v / 10000).toFixed(1) + 'w';
         }
 
         const chartHeart = echarts.init(document.getElementById('chartHeart'));
@@ -188,6 +206,25 @@
             const shortSelectedDate = selectedDate.substring(5);
             const shortPrevDate = prevDateStr.substring(5);
 
+            // 【修复点】计算今日和昨日的总增幅
+            let todayTotalDelta = 0;
+            let prevTotalDelta = 0;
+            
+            if (dataMap[selectedDate]) {
+                Object.values(dataMap[selectedDate]).forEach(d => {
+                    if (d.powerDelta) todayTotalDelta += d.powerDelta;
+                });
+            }
+            if (dataMap[prevDateStr]) {
+                Object.values(dataMap[prevDateStr]).forEach(d => {
+                    if (d.powerDelta) prevTotalDelta += d.powerDelta;
+                });
+            }
+            
+            // 写入胶囊标签
+            document.getElementById('tableSumStats').innerText = 
+                `${shortPrevDate} 团建总增幅: ${fmtW(prevTotalDelta)} | ${shortSelectedDate} 团建总增幅: ${fmtW(todayTotalDelta)}`;
+
             document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
 
             let dayDataList = [];
@@ -237,25 +274,13 @@
                 });
             }
 
-            // ============ 图1：心动人数（折线） & 增幅（柱状） ============
+            // ============ 图1：心动人数 & 发电人数 ============
             const heartSeries = [];
             
-            // 柱状图：增幅（左轴）
-            if (dataMap[selectedDate]) {
-                heartSeries.push({ 
-                    name: shortSelectedDate + ' 增幅', 
-                    type: 'bar', 
-                    data: getSeriesData(selectedDate, 'heartDelta'), 
-                    itemStyle: { color: 'rgba(255, 140, 66, 0.4)' } // 半透明橙色柱子
-                });
-            }
-
-            // 折线图：人数（右轴，让折线不要挡住柱子）
             if (dataMap[selectedDate]) {
                 heartSeries.push({ 
                     name: shortSelectedDate + ' 心动', 
                     type: 'line', 
-                    yAxisIndex: 1, 
                     data: getSeriesData(selectedDate, 'heart'), 
                     smooth: false, 
                     symbol: 'circle', 
@@ -268,7 +293,6 @@
                 heartSeries.push({ 
                     name: shortPrevDate + ' 心动', 
                     type: 'line', 
-                    yAxisIndex: 1,
                     data: getSeriesData(prevDateStr, 'heart'), 
                     smooth: false, 
                     symbol: 'circle', 
@@ -278,39 +302,56 @@
                 });
             }
 
+            const allDates = Object.keys(dataMap).sort();
+            allDates.forEach(date => {
+                if (date === selectedDate || date === prevDateStr) return;
+                heartSeries.push({ 
+                    name: date.substring(5) + ' 心动', 
+                    type: 'line', 
+                    data: getSeriesData(date, 'heart'), 
+                    smooth: false, 
+                    symbol: 'none', 
+                    itemStyle: { color: '#A0A0A0' },
+                    lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, 
+                    emphasis: { disabled: true } 
+                });
+            });
+
+            if (dataMap[selectedDate]) {
+                heartSeries.push({ 
+                    name: shortSelectedDate + ' 总人数', 
+                    type: 'line', 
+                    yAxisIndex: 1, 
+                    data: getSeriesData(selectedDate, 'people'), 
+                    smooth: false, 
+                    symbol: 'circle', 
+                    symbolSize: 4, 
+                    itemStyle: { color: '#8E44AD' }, 
+                    lineStyle: { color: '#8E44AD', width: 2.5 } 
+                });
+            }
+
             chartHeart.hideLoading();
             chartHeart.setOption({
-                tooltip: { trigger: 'axis', confine: true, axisPointer: { type: 'shadow' } },
+                tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '60px', right: '60px', bottom: '10%', top: '15%' },
-                xAxis: { type: 'category', data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
+                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: [
-                    { type: 'value', name: '增幅', position: 'left', scale: true, axisLabel: { fontSize: 11 } },
-                    { type: 'value', name: '累计人数', position: 'right', scale: true, splitLine: { show: false }, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }
+                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
+                    { type: 'value', name: '人数', scale: true, splitLine: { show: false }, axisLabel: { show: false } }
                 ],
                 series: heartSeries
             }, true);
 
-            // ============ 图2：团建电力（折线） & 增幅（柱状） ============
+            // ============ 图2：团建电力增幅趋势 ============
             const powerSeries = [];
             
-            // 柱状图：增幅（左轴）
             if (dataMap[selectedDate]) {
                 powerSeries.push({ 
-                    name: shortSelectedDate + ' 增幅', 
-                    type: 'bar', 
-                    data: getSeriesData(selectedDate, 'powerDelta'), 
-                    itemStyle: { color: 'rgba(255, 140, 66, 0.4)' } 
-                });
-            }
-
-            // 折线图：累计电力（右轴）
-            if (dataMap[selectedDate]) {
-                powerSeries.push({ 
-                    name: shortSelectedDate + ' 团建', 
+                    name: shortSelectedDate + ' 团建增幅', 
                     type: 'line', 
-                    yAxisIndex: 1,
-                    data: getSeriesData(selectedDate, 'power'), 
+                    data: getSeriesData(selectedDate, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
@@ -320,10 +361,9 @@
             }
             if (dataMap[prevDateStr]) {
                 powerSeries.push({ 
-                    name: shortPrevDate + ' 团建', 
+                    name: shortPrevDate + ' 团建增幅', 
                     type: 'line', 
-                    yAxisIndex: 1,
-                    data: getSeriesData(prevDateStr, 'power'), 
+                    data: getSeriesData(prevDateStr, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
@@ -332,16 +372,32 @@
                 });
             }
 
+            allDates.forEach(date => {
+                if (date === selectedDate || date === prevDateStr) return;
+                powerSeries.push({ 
+                    name: date.substring(5) + ' 团建增幅', 
+                    type: 'line', 
+                    data: getSeriesData(date, 'powerDelta'), 
+                    smooth: false, 
+                    symbol: 'none', 
+                    itemStyle: { color: '#A0A0A0' },
+                    lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, 
+                    emphasis: { disabled: true } 
+                });
+            });
+
             chartPower.hideLoading();
             chartPower.setOption({
-                tooltip: { trigger: 'axis', confine: true, axisPointer: { type: 'shadow' } },
+                tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '60px', right: '60px', bottom: '10%', top: '15%' },
-                xAxis: { type: 'category', data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
-                yAxis: [
-                    { type: 'value', name: '增幅', position: 'left', scale: true, axisLabel: { fontSize: 11 } },
-                    { type: 'value', name: '累计电力', position: 'right', scale: true, splitLine: { show: false }, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }
-                ],
+                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
+                yAxis: { 
+                    type: 'value', 
+                    name: '增幅', 
+                    scale: true, 
+                    axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } 
+                },
                 series: powerSeries
             }, true);
         }
