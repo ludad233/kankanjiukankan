@@ -46,8 +46,8 @@
         .chart-scroll-box { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         .chart-scroll-box::-webkit-scrollbar { display: none; }
         
-        /* 【核心修改】把 900px 砍成 450px，手机上可以一屏展示 */
-        .chart-wrapper { width: 450px; height: 320px; }
+        /* 【核心修改】宽度改为 100%，高度固定。让它自动适应屏幕！ */
+        .chart-wrapper { width: 100%; height: 350px; }
         
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
         h3 { text-align: center; color: #333; margin: 0 0 10px 0; font-size: 15px; }
@@ -114,7 +114,7 @@
 
         <div class="card">
             <div class="title">团建电力增幅趋势</div>
-            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 280px;"></div></div>
+            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 300px;"></div></div>
         </div>
     </div>
 
@@ -288,9 +288,9 @@
                     data: getSeriesData(selectedDate, 'heart'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 3, // 手机端稍微缩小圆点
+                    symbolSize: 4, 
                     itemStyle: { color: '#FF8C42' }, 
-                    lineStyle: { color: '#FF8C42', width: 2 } 
+                    lineStyle: { color: '#FF8C42', width: 2.5 } 
                 });
             }
             if (dataMap[prevDateStr]) {
@@ -300,9 +300,9 @@
                     data: getSeriesData(prevDateStr, 'heart'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 3, 
+                    symbolSize: 4, 
                     itemStyle: { color: '#FFB3C6' }, 
-                    lineStyle: { color: '#FFB3C6', width: 1.5 } 
+                    lineStyle: { color: '#FFB3C6', width: 2 } 
                 });
             }
 
@@ -329,25 +329,26 @@
                     data: getSeriesData(selectedDate, 'people'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 3, 
+                    symbolSize: 4, 
                     itemStyle: { color: '#8E44AD' }, 
-                    lineStyle: { color: '#8E44AD', width: 2 } 
+                    lineStyle: { color: '#8E44AD', width: 2.5 } 
                 });
             }
 
             chartHeart.hideLoading();
             chartHeart.setOption({
                 tooltip: { trigger: 'axis', confine: true },
-                legend: { top: '0%', itemWidth: 10, itemHeight: 6, textStyle: { fontSize: 10 }, type: 'scroll' }, // 手机端图例缩小
-                grid: { left: '40px', right: '40px', bottom: '10%', top: '20%' }, // 边距缩小
+                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
+                grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
                 xAxis: { 
                     type: 'category', 
                     boundaryGap: false, 
                     data: xAxisHours, 
-                    axisLabel: { interval: 3, fontSize: 10 } // 手机端每隔 3 小时显示一次时间，防止重叠
+                    // 如果是宽屏自动多显示，窄屏少显示（2小时一格）
+                    axisLabel: { interval: 2, fontSize: 11 } 
                 },
                 yAxis: [
-                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 10, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
+                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
                     { type: 'value', name: '人数', scale: true, splitLine: { show: false }, axisLabel: { show: false } }
                 ],
                 series: heartSeries
@@ -363,9 +364,9 @@
                     data: getSeriesData(selectedDate, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 3, 
+                    symbolSize: 4, 
                     itemStyle: { color: '#FF8C42' }, 
-                    lineStyle: { color: '#FF8C42', width: 2 } 
+                    lineStyle: { color: '#FF8C42', width: 2.5 } 
                 });
             }
             if (dataMap[prevDateStr]) {
@@ -375,9 +376,9 @@
                     data: getSeriesData(prevDateStr, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 3, 
+                    symbolSize: 4, 
                     itemStyle: { color: '#FFB3C6' }, 
-                    lineStyle: { color: '#FFB3C6', width: 1.5 } 
+                    lineStyle: { color: '#FFB3C6', width: 2 } 
                 });
             }
 
@@ -398,19 +399,19 @@
             chartPower.hideLoading();
             chartPower.setOption({
                 tooltip: { trigger: 'axis', confine: true },
-                legend: { top: '0%', itemWidth: 10, itemHeight: 6, textStyle: { fontSize: 10 }, type: 'scroll' },
-                grid: { left: '40px', right: '40px', bottom: '10%', top: '20%' },
+                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
+                grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
                 xAxis: { 
                     type: 'category', 
                     boundaryGap: false, 
                     data: xAxisHours, 
-                    axisLabel: { interval: 3, fontSize: 10 } 
+                    axisLabel: { interval: 2, fontSize: 11 } 
                 },
                 yAxis: { 
                     type: 'value', 
                     name: '增幅', 
                     scale: true, 
-                    axisLabel: { fontSize: 10, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } 
+                    axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } 
                 },
                 series: powerSeries
             }, true);
