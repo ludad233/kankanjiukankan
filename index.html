@@ -54,23 +54,17 @@
         th { background-color: #fdf2e9; color: #d35400; font-weight: bold; text-align: center; font-size: 12px; position: sticky; top: 0; }
         
         th:first-child, td:first-child { 
-            padding-left: 8px; 
-            padding-right: 8px;
-            text-align: left; 
-            color: #666; 
-            position: sticky; 
-            left: 0; 
-            background: white; 
-            z-index: 1;
+            padding-left: 8px; padding-right: 8px; text-align: left; color: #666; 
+            position: sticky; left: 0; background: white; z-index: 1;
             box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
         }
         th:first-child { background: #fdf2e9; z-index: 2; }
         
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
-        /* 【修改点】总电力值改为黑色 */
         .val-total { font-weight: bold; color: #333; } 
-        .val-people { font-weight: bold; color: #8E44AD; }
+        /* 【修改点】发电总人数改为深粉色 */
+        .val-people { font-weight: bold; color: #D81B60; }
         
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
@@ -344,8 +338,9 @@
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
-                    itemStyle: { color: '#8E44AD' }, 
-                    lineStyle: { color: '#8E44AD', width: 2.5 } 
+                    /* 【修改点】折线改为深粉色 */
+                    itemStyle: { color: '#D81B60' }, 
+                    lineStyle: { color: '#D81B60', width: 2.5 } 
                 });
             }
 
