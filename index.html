@@ -7,104 +7,33 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         body {
-            margin: 0;
-            padding: 8px;
-            background-color: #f5f5f5;
+            margin: 0; padding: 8px; background-color: #f5f5f5;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            overflow-x: hidden;
+            display: flex; flex-direction: column; align-items: center; overflow-x: hidden;
         }
-        .container {
-            width: 100%;
-            max-width: 900px; 
-        }
+        .container { width: 100%; max-width: 900px; }
         .card {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            margin-bottom: 12px;
-            padding: 12px 0; 
-            overflow: hidden;
+            background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            margin-bottom: 12px; padding: 12px 0; overflow: hidden;
         }
-        
-        .header-bar {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-bottom: 10px;
-            gap: 10px;
-        }
+        .header-bar { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; gap: 10px; }
         .date-select {
-            font-size: 16px;
-            font-weight: bold;
-            color: #D35400;
-            background-color: #FDF2E9;
-            border: 1px solid #FFB27A;
-            border-radius: 8px;
-            padding: 8px 12px;
-            outline: none;
-            appearance: none;
+            font-size: 16px; font-weight: bold; color: #D35400; background-color: #FDF2E9;
+            border: 1px solid #FFB27A; border-radius: 8px; padding: 8px 12px; outline: none; appearance: none;
         }
-
-        .table-scroll-box {
-            width: 100%;
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-        }
+        
+        .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .table-scroll-box::-webkit-scrollbar { display: none; }
-
-        .chart-scroll-box {
-            width: 100%;
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-        }
+        .chart-scroll-box { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         .chart-scroll-box::-webkit-scrollbar { display: none; }
-
-        .chart-wrapper {
-            width: 900px; 
-            height: 350px;
-        }
-
-        .title {
-            text-align: center;
-            color: #D35400;
-            font-size: 15px;
-            font-weight: bold;
-            margin: 5px 0 10px 0;
-        }
+        .chart-wrapper { width: 900px; height: 350px; }
         
-        h3 {
-            text-align: center;
-            color: #333;
-            margin: 0 0 10px 0;
-            font-size: 15px;
-        }
+        .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
+        h3 { text-align: center; color: #333; margin: 0 0 10px 0; font-size: 15px; }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-            min-width: 850px; 
-        }
-        th, td {
-            padding: 10px 8px;
-            text-align: right;
-            border-bottom: 1px solid #eee;
-            white-space: nowrap;
-        }
-        th {
-            background-color: #fdf2e9;
-            color: #d35400;
-            font-weight: bold;
-            text-align: center;
-            font-size: 12px;
-            position: sticky;
-            top: 0;
-        }
-        
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 850px; }
+        th, td { padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee; white-space: nowrap; }
+        th { background-color: #fdf2e9; color: #d35400; font-weight: bold; text-align: center; font-size: 12px; position: sticky; top: 0; }
         th:first-child, td:first-child { padding-left: 15px; text-align: left; color: #666; position: sticky; left: 0; background: white; z-index: 1;}
         th:first-child { background: #fdf2e9; z-index: 2; }
         
@@ -154,16 +83,12 @@
         <!-- 图表区域 -->
         <div class="card">
             <div class="title">心动人数趋势 (👈左右滑动👉)</div>
-            <div class="chart-scroll-box">
-                <div class="chart-wrapper" id="chartHeart"></div>
-            </div>
+            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartHeart"></div></div>
         </div>
 
         <div class="card">
             <div class="title">团建电力趋势 (👈左右滑动👉)</div>
-            <div class="chart-scroll-box">
-                <div class="chart-wrapper" id="chartPower" style="height: 300px;"></div>
-            </div>
+            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 300px;"></div></div>
         </div>
     </div>
 
@@ -181,10 +106,8 @@
             return str;
         }
 
-        function formatNum(num) {
-            return num ? Number(num).toLocaleString() : '-';
-        }
-
+        function formatNum(num) { return num ? Number(num).toLocaleString() : '-'; }
+        
         function formatDelta(num) {
             if (num === null || num === undefined || num === '' || isNaN(num)) return '-';
             const val = Number(num);
@@ -195,22 +118,27 @@
 
         const chartHeart = echarts.init(document.getElementById('chartHeart'));
         const chartPower = echarts.init(document.getElementById('chartPower'));
-        chartHeart.showLoading();
-        chartPower.showLoading();
+        chartHeart.showLoading(); chartPower.showLoading();
 
         let globalDataMap = {}; 
 
         fetch('power_data.csv?t=' + new Date().getTime())
-            .then(res => res.text())
+            .then(res => {
+                if(!res.ok) throw new Error('网络请求失败，找不到CSV文件');
+                return res.text();
+            })
             .then(csv => {
                 const lines = csv.trim().split('\n').slice(1);
                 const datesSet = new Set();
 
                 lines.forEach(line => {
                     const cols = line.split(',');
-                    if (cols.length < 13) return; // 确保有 13 列数据
+                    // 强制兼容新旧格式：只要至少包含 9 列（时间+心动+增幅+团建+增幅+总电+增幅+人数+增幅）
+                    if (cols.length < 9) return; 
                     
                     const timeStr = cols[0].trim();
+                    if(!timeStr) return;
+
                     const datePart = timeStr.split(' ')[0].replace(/\//g, '-');
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
@@ -227,10 +155,10 @@
                         heartDelta: cols[2] !== '' ? Number(cols[2]) : null,
                         power: Number(cols[3]) || null,
                         powerDelta: cols[4] !== '' ? Number(cols[4]) : null,
-                        totalPower: Number(cols[9]) || null,
-                        totalDelta: cols[10] !== '' ? Number(cols[10]) : null,
-                        people: Number(cols[11]) || null,
-                        peopleDelta: cols[12] !== '' ? Number(cols[12]) : null
+                        totalPower: Number(cols[5]) || null,
+                        totalDelta: cols[6] !== '' ? Number(cols[6]) : null,
+                        people: Number(cols[7]) || null,
+                        peopleDelta: cols[8] !== '' ? Number(cols[8]) : null
                     };
                 });
 
@@ -239,23 +167,16 @@
                 
                 sortedDates.forEach(date => {
                     const opt = document.createElement('option');
-                    opt.value = date;
-                    opt.innerText = date;
-                    selector.appendChild(opt);
+                    opt.value = date; opt.innerText = date; selector.appendChild(opt);
                 });
 
-                if (sortedDates.length > 0) {
-                    selector.value = sortedDates[0];
-                }
-
-                selector.addEventListener('change', (e) => {
-                    renderPage(e.target.value);
-                });
-
+                if (sortedDates.length > 0) { selector.value = sortedDates[0]; }
+                selector.addEventListener('change', (e) => { renderPage(e.target.value); });
                 renderPage(selector.value);
             })
-            .catch(err => {
-                console.error('数据加载失败:', err);
+            .catch(err => { 
+                console.error('数据加载失败:', err); 
+                document.querySelector('#dataTable tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:red;">读取失败，请确保 power_data.csv 存在于仓库主页，并已清空旧数据重新生成。</td></tr>';
             });
 
         function renderPage(selectedDate) {
@@ -280,7 +201,7 @@
             tbody.innerHTML = '';
 
             if (latestRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">暂无数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">该日期暂无数据</td></tr>';
             } else {
                 latestRows.forEach(row => {
                     const tr = document.createElement('tr');
@@ -346,4 +267,15 @@
             chartPower.hideLoading();
             chartPower.setOption({
                 tooltip: { trigger: 'axis', confine: true },
-                legend: { top: '0%', itemWidth: 12, itemHeight: 8,
+                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
+                grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
+                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
+                yAxis: { type: 'value', name: '电力', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
+                series: powerSeries
+            }, true);
+        }
+
+        window.addEventListener('resize', function() { chartHeart.resize(); chartPower.resize(); });
+    </script>
+</body>
+</html>
