@@ -2,6 +2,7 @@ import asyncio
 import csv
 import os
 import re
+import shutil
 from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
 
@@ -14,15 +15,15 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 # ============ 配置 ============
-# 已替换为你提供的团建链接（去掉了个人追踪参数，避免泄露）
-URL_TEAM1 = "https://y.qq.com/tmead/promotion/h5/team-activity/detail?singerId=6665073&activityId=17936311664035"
+URL_TEAM1 = "https://y.qq.com/tmead/promotion/h5/team-activity/detail?_hidehd=1&_miniplayer=1&adtag=sszd&singerId=6665073&activityId=17931826095559&searchid=113943832761792946,&hosteuin=ow657wSlownlon**&ADTAG=wxfshare"
 URL_TEAM2 = None
 URL_POWER = "https://y.qq.com/tmead/promotion/h5/powering/1793152992875?_hidehd=1&_miniplayer=1&adtag=share_task&singerId=6665073&p_share=w2pZEizuC5V-xTHRIivoTwD_5f_DMRfGNgTtS7isP_4&hosteuin=oiEqow6FoiCA7n**&ADTAG=wxfshare"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, "power_data.csv")
 CHART_FILE = os.path.join(BASE_DIR, "comparison_chart.png")
-# 已彻底移除 HISTORY_DIR
+HISTORY_DIR = os.path.join(BASE_DIR, "history")
+os.makedirs(HISTORY_DIR, exist_ok=True)
 
 
 # ============ 抓取与存储 ============
@@ -36,15 +37,20 @@ async def scrape_team(page, url):
     if not url: return {"今日心动人数": None, "团建电力值": None}
 
     result = {"今日心动人数": None, "团建电力值": None}
+    max_retries = 3
 
-    # 增加重试机制，最多试 2 次
-    for attempt in range(2):
+    for attempt in range(max_retries):
         try:
-            await page.goto(url, wait_until="networkidle", timeout=90000)
-            # 增加等待时间到 8 秒，给活动页面的动态数据充分的渲染时间
-            await page.wait_for_timeout(8000)
+            print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取团建数据...")
+            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-            # 尝试抓取心动人数
+            try:
+                await page.wait_for_selector("text=本团今日心动", timeout=15000)
+            except:
+                pass
+
+            await page.wait_for_timeout(2000)
+
             try:
                 heart_ele = page.locator("text=本团今日心动").first
                 parent_text = await heart_ele.evaluate("el => el.parentElement.innerText")
@@ -52,7 +58,6 @@ async def scrape_team(page, url):
             except:
                 pass
 
-            # 尝试抓取团建电力
             try:
                 body_text = await page.locator("body").inner_text()
                 matches = re.findall(r"(\d{1,3}(?:,\d{3})+)\s*/\s*(\d{1,3}(?:,\d{3})+)", body_text)
@@ -62,26 +67,37 @@ async def scrape_team(page, url):
             except:
                 pass
 
-            # 如果至少抓到了其中一个数据，说明加载成功了，跳出重试
-            if result["今日心动人数"] is not None or result["团建电力值"] is not None:
-                break
+            if result["今日心动人数"] is not None and result["今日心动人数"] > 0 and result["团建电力值"] is not None:
+                print(f"✅ 团建数据抓取成功！心动: {result['今日心动人数']}, 电力: {result['团建电力值']}")
+                return result
             else:
-                print(f"⚠️ 第 {attempt + 1} 次抓取为空，准备重试...")
-                await page.wait_for_timeout(2000)
+                print(f"⚠️ 第 {attempt + 1} 次抓取数据异常（可能未加载完），准备重试...")
+                await page.reload()
+                await page.wait_for_timeout(3000)
+
         except Exception as e:
-            print(f"⚠️ 第 {attempt + 1} 次抓取异常: {e}")
+            print(f"⚠️ 第 {attempt + 1} 次抓取抛出异常: {e}")
+            await page.wait_for_timeout(3000)
 
     return result
 
 
 async def scrape_power(page):
     result = {"总电力值": None}
+    max_retries = 3
 
-    for attempt in range(2):
+    for attempt in range(max_retries):
         try:
-            # 尝试使用 load 代替 networkidle，避免由于持续请求导致的超时
-            await page.goto(URL_POWER, wait_until="load", timeout=90000)
-            await page.wait_for_timeout(8000)
+            print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取总电力值...")
+            await page.goto(URL_POWER, wait_until="domcontentloaded", timeout=60000)
+
+            try:
+                await page.wait_for_selector("body", timeout=10000)
+            except:
+                pass
+
+            await page.wait_for_timeout(3000)
+
             try:
                 body_text = await page.locator("body").inner_text()
                 nums = re.findall(r"\d{1,3}(?:,\d{3})+", body_text)
@@ -90,12 +106,17 @@ async def scrape_power(page):
             except:
                 pass
 
-            if result["总电力值"] is not None:
-                break
+            if result["总电力值"] is not None and result["总电力值"] > 0:
+                print(f"✅ 总电力抓取成功！总电力: {result['总电力值']}")
+                return result
             else:
-                print(f"⚠️ 总电力第 {attempt + 1} 次抓取为空，准备重试...")
+                print(f"⚠️ 第 {attempt + 1} 次总电力抓取异常，准备重试...")
+                await page.reload()
+                await page.wait_for_timeout(3000)
+
         except Exception as e:
-            print(f"⚠️ 总电力第 {attempt + 1} 次抓取异常: {e}")
+            print(f"⚠️ 第 {attempt + 1} 次抓取总电力异常: {e}")
+            await page.wait_for_timeout(3000)
 
     return result
 
@@ -124,17 +145,24 @@ def parse_dt_loose(s):
     return None
 
 
+# 【核心修复点】：加入智能向上追溯逻辑
 def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
-    curr_hour_str = fmt_no_pad(curr_dt)
-    prev_hour_str = fmt_no_pad(curr_dt - timedelta(hours=1))
+    # 如果没找到上一小时的数据，就往前找最多 12 个小时
+    for i in range(1, 13):
+        prev_hour_dt = curr_dt - timedelta(hours=i)
+        prev_hour_str = fmt_no_pad(prev_hour_dt)
 
-    for row in reversed(all_rows):
-        if not row or len(row) < 10: continue
-        if row[0].startswith(curr_hour_str) and curr_dt.minute <= 5: pass
-        if row[0].startswith(prev_hour_str): return row
+        # 如果跨天了，就不往上找了（防止把昨天半夜的数据算进今天早上）
+        if prev_hour_dt.day != curr_dt.day:
+            break
+
+        for row in reversed(all_rows):
+            if not row or len(row) < 10: continue
+            if row[0].startswith(prev_hour_str):
+                return row
     return None
 
 
@@ -234,7 +262,6 @@ def generate_chart(target_date, save_path, is_final=False):
 
     plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei", "Microsoft YaHei", "SimHei", "Arial Unicode MS",
                                        "DejaVu Sans"]
-    plt.rcParams["font.weight"] = "normal"  # 添加这一行消除 findfont 警告
     plt.rcParams["axes.unicode_minus"] = False
 
     fig, axes = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
@@ -441,13 +468,27 @@ async def run_once():
     now_bj = datetime.now() + timedelta(hours=8)
 
     async with async_playwright() as p:
-        # 强制使用 HTTP/1.1，绕过 HTTP/2 协议错误
-        browser = await p.chromium.launch(
-            headless=True,
-            args=["--disable-http2"]
-        )
+        browser = await p.chromium.launch(headless=True)
         context = await browser.new_context(
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1")
+            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
+            viewport={"width": 390, "height": 844},
+            device_scale_factor=3,
+            is_mobile=True,
+            has_touch=True,
+            locale="zh-CN",
+            timezone_id="Asia/Shanghai"
+        )
+
+        await context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+        """)
+
         page = await context.new_page()
 
         data = {"时间": now_bj.strftime("%Y-%m-%d %H:%M:%S")}
@@ -456,12 +497,13 @@ async def run_once():
         t1 = await scrape_team(page, URL_TEAM1)
         data["今日心动人数1"], data["团建电力值1"] = t1["今日心动人数"], t1["团建电力值"]
         data["今日心动人数2"], data["团建电力值2"] = None, None
+
         pwr = await scrape_power(page)
         data["总电力值"] = pwr["总电力值"]
         await browser.close()
 
     if data["今日心动人数1"] is None and data["团建电力值1"] is None and data["总电力值"] is None:
-        print("❌ 抓取失败：所有数据均为空，网页加载超时或网络被拦截。")
+        print("❌ 抓取失败：所有数据均为空，经过 3 次重试依然被拦截或超时。")
         print(f"当前抓取时间: {data['时间']}")
         return
 
@@ -474,13 +516,19 @@ async def run_once():
 
         today_date = chart_date.date()
         generate_chart(today_date, CHART_FILE)
-        # 删除了原来的 23:59 归档到 history 的逻辑
+
+        if curr_dt.hour == 23 and curr_dt.minute >= 50:
+            archive_name = f"{today_date}.png"
+            archive_path = os.path.join(HISTORY_DIR, archive_name)
+            shutil.copy(CHART_FILE, archive_path)
+            print(f"📁 已生成每日归档图片：{archive_path}")
+
     except Exception as e:
         print(f"生成图表失败: {e}")
 
 
 async def main():
-    print("定时任务已启动...")
+    print("定时任务已启动 (增强防御版)...")
     try:
         await run_once()
     except Exception as e:
