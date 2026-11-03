@@ -145,17 +145,14 @@ def parse_dt_loose(s):
     return None
 
 
-# 【核心修复点】：加入智能向上追溯逻辑
 def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
-    # 如果没找到上一小时的数据，就往前找最多 12 个小时
     for i in range(1, 13):
         prev_hour_dt = curr_dt - timedelta(hours=i)
         prev_hour_str = fmt_no_pad(prev_hour_dt)
 
-        # 如果跨天了，就不往上找了（防止把昨天半夜的数据算进今天早上）
         if prev_hour_dt.day != curr_dt.day:
             break
 
