@@ -18,18 +18,17 @@
         }
         .container {
             width: 100%;
-            max-width: 1400px;
+            max-width: 900px; 
         }
         .card {
             background: white;
-            padding: 12px 8px;
             border-radius: 12px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             margin-bottom: 12px;
+            padding: 12px 0; 
             overflow: hidden;
         }
         
-        /* 顶部日期选择器 */
         .header-bar {
             display: flex;
             justify-content: center;
@@ -78,17 +77,18 @@
             font-weight: bold;
             margin: 5px 0 10px 0;
         }
-        .stats-wrap { text-align: center; margin-bottom: 10px; }
+        .stats-wrap { text-align: center; margin-bottom: 10px; padding: 0 10px; }
         .stats {
             text-align: center;
-            font-size: 13px;
+            font-size: 12px; 
             font-weight: bold;
             color: #555;
             background: #FDF2E9;
             border: 1px solid #FFB27A;
             border-radius: 20px;
-            padding: 4px 12px;
+            padding: 6px 10px;
             display: inline-block;
+            line-height: 1.4;
         }
         
         h3 {
@@ -103,10 +103,10 @@
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            min-width: 800px;
+            min-width: 850px; /* 手机上必须滑动才能看全 */
         }
         th, td {
-            padding: 10px 6px;
+            padding: 10px 8px;
             text-align: right;
             border-bottom: 1px solid #eee;
             white-space: nowrap;
@@ -117,15 +117,17 @@
             font-weight: bold;
             text-align: center;
             font-size: 12px;
+            position: sticky;
+            top: 0;
         }
-        td:nth-child(1) { text-align: left; color: #666; }
         
-        /* 数字高亮 */
+        th:first-child, td:first-child { padding-left: 15px; text-align: left; color: #666; position: sticky; left: 0; background: white; z-index: 1;}
+        th:first-child { background: #fdf2e9; z-index: 2; }
+        
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
         .val-total { font-weight: bold; color: #2980b9; } 
         
-        /* 增幅颜色 */
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
     </style>
@@ -133,7 +135,7 @@
 <body>
     <div class="container">
         <!-- 日期选择区 -->
-        <div class="card" style="padding: 10px; text-align: center;">
+        <div class="card" style="padding: 10px 0; text-align: center;">
             <div class="header-bar">
                 <span>选择查看日期：</span>
                 <select id="dateSelector" class="date-select"></select>
@@ -183,16 +185,6 @@
     </div>
 
     <script>
-        function getBeijingDate() {
-            let d = new Date();
-            let utc = d.getTime() + (d.getTimezoneOffset() * 60000);
-            let nd = new Date(utc + (3600000 * 8));
-            return nd.toISOString().split('T')[0];
-        }
-        
-        const todayStr = getBeijingDate();
-        
-        // 将时间统一格式化为 HH:00
         function parseTimeStr(str) {
             if (!str) return "";
             let parts = str.split(' ');
@@ -240,8 +232,7 @@
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
-                    // 【过滤1】：只统计 2026-11-01 及以后的数据
-                    if (formattedDate < '2026-11-01') return;
+                    if (formattedDate < '2026-11-01') return; // 只显示 11 月后的数据
 
                     const timeHour = parseTimeStr(timeStr);
                     datesSet.add(formattedDate);
@@ -258,6 +249,7 @@
                     };
                 });
 
+                // 把日期倒序排列，最新的日期在最上面
                 const sortedDates = Array.from(datesSet).sort().reverse(); 
                 const selector = document.getElementById('dateSelector');
                 
@@ -268,9 +260,8 @@
                     selector.appendChild(opt);
                 });
 
-                if (datesSet.has(todayStr)) {
-                    selector.value = todayStr;
-                } else if (sortedDates.length > 0) {
+                // 【核心修复】：无论今天几号，直接强制选中降序排列的第一个（即最新数据那天）
+                if (sortedDates.length > 0) {
                     selector.value = sortedDates[0];
                 }
 
@@ -292,7 +283,6 @@
             prevDateObj.setDate(prevDateObj.getDate() - 1);
             const prevDateStr = prevDateObj.toISOString().split('T')[0];
 
-            // 渲染总计和表格
             let selectedTotalDelta = 0;
             let prevTotalDelta = 0;
             
@@ -309,7 +299,7 @@
             
             function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
             document.getElementById('tableSumStats').innerText = 
-                `${prevDateStr} 总增幅: ${fmtW(prevTotalDelta)} | ${selectedDate} 总增幅: ${fmtW(selectedTotalDelta)}`;
+                `${prevDateStr} 总增幅: ${fmtW(prevTotalDelta)}\n${selectedDate} 总增幅: ${fmtW(selectedTotalDelta)}`;
             document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
 
             let dayDataList = [];
@@ -342,7 +332,6 @@
                 });
             }
 
-            // 渲染图表
             const xAxisHours = [];
             for (let i = 0; i <= 24; i++) {
                 xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
@@ -361,7 +350,6 @@
             const heartSeries = [];
             const powerSeries = [];
             
-            // 选中的日期（橙）和前一天（粉）
             if (dataMap[selectedDate]) {
                 heartSeries.push({
                     name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'heart'),
@@ -383,7 +371,6 @@
                 });
             }
 
-            // 【修改点】：自动把 11 月的其他历史日期加为灰线
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
@@ -403,7 +390,7 @@
             chartHeart.setOption({
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
+                grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: { type: 'value', name: '人数', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
                 series: heartSeries
@@ -413,7 +400,7 @@
             chartPower.setOption({
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '5%', right: '5%', bottom: '10%', top: '15%', containLabel: true },
+                grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: { type: 'value', name: '增幅', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 1000000 ? (v / 1000000).toFixed(1) + 'm' : v; } } },
                 series: powerSeries
