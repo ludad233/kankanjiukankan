@@ -103,14 +103,15 @@ async def scrape_power(page):
                 if nums:
                     result["总电力值"] = max(int(n.replace(",", "")) for n in nums)
 
-                # 提取发电总人数
-                people_matches = re.findall(r"([\d,]+)\s*人", body_text)
+                # 【核心修复】精准提取“发电总人数”后面的数字
+                people_matches = re.search(r"发电总人数\s*([\d,]+)", body_text)
                 if people_matches:
-                    result["发电总人数"] = max(int(p.replace(",", "")) for p in people_matches)
+                    result["发电总人数"] = int(people_matches.group(1).replace(",", ""))
                 else:
-                    participate_matches = re.findall(r"参与.*?([\d,]+)", body_text)
+                    # 备用方案：如果没匹配到“发电总人数”，就找“参与”后面的数字
+                    participate_matches = re.search(r"参与.*?([\d,]+)", body_text)
                     if participate_matches:
-                        result["发电总人数"] = max(int(p.replace(",", "")) for p in participate_matches)
+                        result["发电总人数"] = int(participate_matches.group(1).replace(",", ""))
             except Exception as parse_e:
                 pass
 
@@ -164,7 +165,7 @@ def get_prev_hour_record(curr_dt, all_rows):
             break
 
         for row in reversed(all_rows):
-            if not row or len(row) < 10: continue
+            if not row or len(row) < 9: continue
             if row[0].startswith(prev_hour_str):
                 return row
     return None
