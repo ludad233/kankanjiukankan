@@ -265,21 +265,23 @@
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
+                // 【修改点1】：图例名加上“心动”，并且把 Tooltip 里的圆点颜色设为深灰色，但线条依然是虚线
                 heartSeries.push({ 
                     name: date.substring(5) + ' 心动', 
                     type: 'line', 
                     data: getSeriesData(date, 'heart'), 
                     smooth: false, 
                     symbol: 'none', 
+                    itemStyle: { color: '#A0A0A0' },
                     lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, 
                     emphasis: { disabled: true } 
                 });
             });
 
-            // 【修复点】把人数放到最后，这样在 Tooltip 中就会显示在最下面
+            // 【修改点2】：名字改成“总人数”，放在最后面
             if (dataMap[selectedDate]) {
                 heartSeries.push({ 
-                    name: selectedDate + ' 人数', 
+                    name: selectedDate + ' 总人数', 
                     type: 'line', 
                     yAxisIndex: 1, 
                     data: getSeriesData(selectedDate, 'people'), 
@@ -340,6 +342,7 @@
                     data: getSeriesData(date, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'none', 
+                    itemStyle: { color: '#A0A0A0' },
                     lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, 
                     emphasis: { disabled: true } 
                 });
