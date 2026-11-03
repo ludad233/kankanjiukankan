@@ -41,23 +41,37 @@
             box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
         }
 
+        /* 表格容器 */
         .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .table-scroll-box::-webkit-scrollbar { display: none; }
         
+        /* 图表容器：100% 宽度自适应 */
         .chart-wrapper { width: 100%; height: 350px; }
         
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
         h3 { text-align: center; color: #333; margin: 0 0 10px 0; font-size: 15px; }
 
-        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 850px; }
+        /* 表格样式 */
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 750px; }
         th, td { padding: 10px 8px; text-align: right; border-bottom: 1px solid #eee; white-space: nowrap; }
         th { background-color: #fdf2e9; color: #d35400; font-weight: bold; text-align: center; font-size: 12px; position: sticky; top: 0; }
-        th:first-child, td:first-child { padding-left: 15px; text-align: left; color: #666; position: sticky; left: 0; background: white; z-index: 1;}
+        
+        /* 固定首列（时间），在手机上左右滑动时不会跟着滑走 */
+        th:first-child, td:first-child { 
+            padding-left: 15px; 
+            text-align: left; 
+            color: #666; 
+            position: sticky; 
+            left: 0; 
+            background: white; 
+            z-index: 1;
+            box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1); /* 加个淡淡的阴影区分 */
+        }
         th:first-child { background: #fdf2e9; z-index: 2; }
         
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
-        .val-total { font-weight: bold; color: #D81B60; } /* 深粉色 */
+        .val-total { font-weight: bold; color: #D81B60; } 
         .val-people { font-weight: bold; color: #8E44AD; }
         
         .up { color: #e74c3c; font-weight: bold; }
@@ -343,7 +357,6 @@
                 tooltip: { 
                     trigger: 'axis', 
                     confine: true,
-                    // 恢复带增幅的自定义提示框
                     formatter: function (params) {
                         let timeStr = params[0].axisValue;
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
