@@ -82,12 +82,12 @@
 
         <!-- 图表区域 -->
         <div class="card">
-            <div class="title">心动人数 & 发电人数趋势 (👈左右滑动👉)</div>
+            <div class="title">心动人数趋势 (👈左右滑动👉)</div>
             <div class="chart-scroll-box"><div class="chart-wrapper" id="chartHeart"></div></div>
         </div>
 
         <div class="card">
-            <div class="title">电力趋势对比 (👈左右滑动👉)</div>
+            <div class="title">增幅趋势 (👈左右滑动👉)</div>
             <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 300px;"></div></div>
         </div>
     </div>
@@ -237,7 +237,6 @@
             // ============ 图1：心动人数 & 发电人数 ============
             const heartSeries = [];
             
-            // 今天（橙色）和昨天（粉色）
             if (dataMap[selectedDate]) {
                 heartSeries.push({ 
                     name: selectedDate + ' 心动', 
@@ -249,11 +248,11 @@
                     itemStyle: { color: '#FF8C42' }, 
                     lineStyle: { color: '#FF8C42', width: 2.5 } 
                 });
-                // 【新增】今天发电总人数（紫色）
+                // 发电总人数（紫色）
                 heartSeries.push({ 
                     name: selectedDate + ' 人数', 
                     type: 'line', 
-                    yAxisIndex: 1, // 使用右侧的 Y 轴
+                    yAxisIndex: 1, 
                     data: getSeriesData(selectedDate, 'people'), 
                     smooth: false, 
                     symbol: 'circle', 
@@ -275,7 +274,6 @@
                 });
             }
 
-            // 历史心动人数灰线
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
@@ -303,25 +301,26 @@
                 series: heartSeries
             }, true);
 
-            // ============ 图2：电力趋势 & 总电力增幅 ============
+            // ============ 图2：增幅趋势（只画团建增幅 & 总电增幅） ============
             const powerSeries = [];
             
             if (dataMap[selectedDate]) {
+                // 团建增幅（橙色）
                 powerSeries.push({ 
-                    name: selectedDate + ' 团建', 
+                    name: selectedDate + ' 团建增幅', 
                     type: 'line', 
-                    data: getSeriesData(selectedDate, 'power'), 
+                    data: getSeriesData(selectedDate, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
                     itemStyle: { color: '#FF8C42' }, 
                     lineStyle: { color: '#FF8C42', width: 2.5 } 
                 });
-                // 【新增】今天总电力增幅（紫色）
+                // 总电力增幅（紫色）
                 powerSeries.push({ 
-                    name: selectedDate + ' 总增幅', 
+                    name: selectedDate + ' 总电增幅', 
                     type: 'line', 
-                    yAxisIndex: 1, // 使用右侧 Y 轴
+                    yAxisIndex: 1, 
                     data: getSeriesData(selectedDate, 'totalDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
@@ -331,10 +330,11 @@
                 });
             }
             if (dataMap[prevDateStr]) {
+                // 昨天团建增幅（粉色）
                 powerSeries.push({ 
-                    name: prevDateStr + ' 团建', 
+                    name: prevDateStr + ' 团建增幅', 
                     type: 'line', 
-                    data: getSeriesData(prevDateStr, 'power'), 
+                    data: getSeriesData(prevDateStr, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
@@ -343,13 +343,13 @@
                 });
             }
 
-            // 历史团建灰线
+            // 历史团建增幅灰线
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
                 powerSeries.push({ 
-                    name: date.substring(5) + ' 团建', 
+                    name: date.substring(5) + ' 团建增幅', 
                     type: 'line', 
-                    data: getSeriesData(date, 'power'), 
+                    data: getSeriesData(date, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'none', 
                     lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, 
@@ -364,7 +364,7 @@
                 grid: { left: '0%', right: '10%', bottom: '10%', top: '15%', containLabel: true },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: [
-                    { type: 'value', name: '团建电力', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
+                    { type: 'value', name: '团建增幅', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
                     { type: 'value', name: '总电增幅', scale: true, splitLine: { show: false }, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }
                 ],
                 series: powerSeries
