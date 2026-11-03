@@ -26,6 +26,7 @@
         .table-scroll-box::-webkit-scrollbar { display: none; }
         .chart-scroll-box { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         .chart-scroll-box::-webkit-scrollbar { display: none; }
+        /* 保证两个图表容器宽度绝对一致 */
         .chart-wrapper { width: 900px; height: 350px; }
         
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
@@ -82,7 +83,7 @@
 
         <!-- 图表区域 -->
         <div class="card">
-            <div class="title">心动人数趋势 (👈左右滑动👉)</div>
+            <div class="title">心动人数 & 总人数 (👈左右滑动👉)</div>
             <div class="chart-scroll-box"><div class="chart-wrapper" id="chartHeart"></div></div>
         </div>
 
@@ -248,7 +249,7 @@
                     itemStyle: { color: '#FF8C42' }, 
                     lineStyle: { color: '#FF8C42', width: 2.5 } 
                 });
-                // 发电总人数（紫色）
+                // 发电总人数（紫色）—— 强制指向右侧无文字轴
                 heartSeries.push({ 
                     name: selectedDate + ' 人数', 
                     type: 'line', 
@@ -289,14 +290,15 @@
             });
 
             chartHeart.hideLoading();
+            // 核心修复：使用 grid 锁死左右边距，隐藏右侧轴文字，确保两张图宽度绝对一致
             chartHeart.setOption({
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '0%', right: '10%', bottom: '10%', top: '15%', containLabel: true },
+                grid: { left: '60px', right: '60px', bottom: '10%', top: '15%' },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: [
                     { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
-                    { type: 'value', name: '人数', scale: true, splitLine: { show: false }, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }
+                    { type: 'value', name: '人数', scale: true, splitLine: { show: false }, axisLabel: { show: false } } // 隐藏刻度文字
                 ],
                 series: heartSeries
             }, true);
@@ -305,7 +307,6 @@
             const powerSeries = [];
             
             if (dataMap[selectedDate]) {
-                // 团建增幅（橙色）
                 powerSeries.push({ 
                     name: selectedDate + ' 团建增幅', 
                     type: 'line', 
@@ -318,7 +319,6 @@
                 });
             }
             if (dataMap[prevDateStr]) {
-                // 昨天团建增幅（粉色）
                 powerSeries.push({ 
                     name: prevDateStr + ' 团建增幅', 
                     type: 'line', 
@@ -331,7 +331,6 @@
                 });
             }
 
-            // 历史团建增幅灰线
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
                 powerSeries.push({ 
@@ -346,10 +345,11 @@
             });
 
             chartPower.hideLoading();
+            // 核心修复：使用 grid 锁死左右边距
             chartPower.setOption({
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
+                grid: { left: '60px', right: '60px', bottom: '10%', top: '15%' },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
                 yAxis: { 
                     type: 'value', 
