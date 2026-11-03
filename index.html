@@ -185,6 +185,10 @@
             prevDateObj.setDate(prevDateObj.getDate() - 1);
             const prevDateStr = prevDateObj.toISOString().split('T')[0];
 
+            // 去掉年份的前缀，例如把 "2026-11-03" 变成 "11-03"
+            const shortSelectedDate = selectedDate.substring(5);
+            const shortPrevDate = prevDateStr.substring(5);
+
             document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
 
             let dayDataList = [];
@@ -239,7 +243,7 @@
             
             if (dataMap[selectedDate]) {
                 heartSeries.push({ 
-                    name: selectedDate + ' 心动', 
+                    name: shortSelectedDate + ' 心动', 
                     type: 'line', 
                     data: getSeriesData(selectedDate, 'heart'), 
                     smooth: false, 
@@ -251,7 +255,7 @@
             }
             if (dataMap[prevDateStr]) {
                 heartSeries.push({ 
-                    name: prevDateStr + ' 心动', 
+                    name: shortPrevDate + ' 心动', 
                     type: 'line', 
                     data: getSeriesData(prevDateStr, 'heart'), 
                     smooth: false, 
@@ -265,7 +269,6 @@
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
-                // 【修改点1】：图例名加上“心动”，并且把 Tooltip 里的圆点颜色设为深灰色，但线条依然是虚线
                 heartSeries.push({ 
                     name: date.substring(5) + ' 心动', 
                     type: 'line', 
@@ -278,10 +281,9 @@
                 });
             });
 
-            // 【修改点2】：名字改成“总人数”，放在最后面
             if (dataMap[selectedDate]) {
                 heartSeries.push({ 
-                    name: selectedDate + ' 总人数', 
+                    name: shortSelectedDate + ' 总人数', 
                     type: 'line', 
                     yAxisIndex: 1, 
                     data: getSeriesData(selectedDate, 'people'), 
@@ -311,7 +313,7 @@
             
             if (dataMap[selectedDate]) {
                 powerSeries.push({ 
-                    name: selectedDate + ' 团建增幅', 
+                    name: shortSelectedDate + ' 团建增幅', 
                     type: 'line', 
                     data: getSeriesData(selectedDate, 'powerDelta'), 
                     smooth: false, 
@@ -323,7 +325,7 @@
             }
             if (dataMap[prevDateStr]) {
                 powerSeries.push({ 
-                    name: prevDateStr + ' 团建增幅', 
+                    name: shortPrevDate + ' 团建增幅', 
                     type: 'line', 
                     data: getSeriesData(prevDateStr, 'powerDelta'), 
                     smooth: false, 
