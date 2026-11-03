@@ -48,7 +48,6 @@
             appearance: none;
         }
 
-        /* 表格滑动框 */
         .table-scroll-box {
             width: 100%;
             overflow-x: auto;
@@ -56,7 +55,6 @@
         }
         .table-scroll-box::-webkit-scrollbar { display: none; }
 
-        /* 图表滑动框 */
         .chart-scroll-box {
             width: 100%;
             overflow-x: auto;
@@ -77,19 +75,6 @@
             font-weight: bold;
             margin: 5px 0 10px 0;
         }
-        .stats-wrap { text-align: center; margin-bottom: 10px; padding: 0 10px; }
-        .stats {
-            text-align: center;
-            font-size: 12px; 
-            font-weight: bold;
-            color: #555;
-            background: #FDF2E9;
-            border: 1px solid #FFB27A;
-            border-radius: 20px;
-            padding: 6px 10px;
-            display: inline-block;
-            line-height: 1.4;
-        }
         
         h3 {
             text-align: center;
@@ -98,12 +83,11 @@
             font-size: 15px;
         }
 
-        /* 表格样式 */
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 13px;
-            min-width: 850px; /* 手机上必须滑动才能看全 */
+            min-width: 850px; 
         }
         th, td {
             padding: 10px 8px;
@@ -127,6 +111,7 @@
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
         .val-total { font-weight: bold; color: #2980b9; } 
+        .val-people { font-weight: bold; color: #8E44AD; }
         
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
@@ -134,14 +119,10 @@
 </head>
 <body>
     <div class="container">
-        <!-- 日期选择区 -->
         <div class="card" style="padding: 10px 0; text-align: center;">
             <div class="header-bar">
                 <span>选择查看日期：</span>
                 <select id="dateSelector" class="date-select"></select>
-            </div>
-            <div class="stats-wrap">
-                <div class="stats" id="tableSumStats">总计计算中...</div>
             </div>
         </div>
 
@@ -159,10 +140,12 @@
                             <th>电力增幅</th>
                             <th>总电力值</th>
                             <th>总电增幅</th>
+                            <th>发电总人数</th>
+                            <th>人数增幅</th>
                         </tr>
                     </thead>
                     <tbody>
-                        <tr><td colspan="7" style="text-align:center;">数据加载中...</td></tr>
+                        <tr><td colspan="9" style="text-align:center;">数据加载中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -177,7 +160,7 @@
         </div>
 
         <div class="card">
-            <div class="title">电力增幅趋势 (👈左右滑动👉)</div>
+            <div class="title">团建电力趋势 (👈左右滑动👉)</div>
             <div class="chart-scroll-box">
                 <div class="chart-wrapper" id="chartPower" style="height: 300px;"></div>
             </div>
@@ -225,14 +208,14 @@
 
                 lines.forEach(line => {
                     const cols = line.split(',');
-                    if (cols.length < 10) return;
+                    if (cols.length < 13) return; // 确保有 13 列数据
                     
                     const timeStr = cols[0].trim();
                     const datePart = timeStr.split(' ')[0].replace(/\//g, '-');
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
-                    if (formattedDate < '2026-11-01') return; // 只显示 11 月后的数据
+                    if (formattedDate < '2026-11-01') return;
 
                     const timeHour = parseTimeStr(timeStr);
                     datesSet.add(formattedDate);
@@ -245,11 +228,12 @@
                         power: Number(cols[3]) || null,
                         powerDelta: cols[4] !== '' ? Number(cols[4]) : null,
                         totalPower: Number(cols[9]) || null,
-                        totalDelta: cols[10] !== '' ? Number(cols[10]) : null
+                        totalDelta: cols[10] !== '' ? Number(cols[10]) : null,
+                        people: Number(cols[11]) || null,
+                        peopleDelta: cols[12] !== '' ? Number(cols[12]) : null
                     };
                 });
 
-                // 把日期倒序排列，最新的日期在最上面
                 const sortedDates = Array.from(datesSet).sort().reverse(); 
                 const selector = document.getElementById('dateSelector');
                 
@@ -260,7 +244,6 @@
                     selector.appendChild(opt);
                 });
 
-                // 【核心修复】：无论今天几号，直接强制选中降序排列的第一个（即最新数据那天）
                 if (sortedDates.length > 0) {
                     selector.value = sortedDates[0];
                 }
@@ -273,7 +256,6 @@
             })
             .catch(err => {
                 console.error('数据加载失败:', err);
-                document.getElementById('tableSumStats').innerText = '数据加载失败';
             });
 
         function renderPage(selectedDate) {
@@ -283,23 +265,6 @@
             prevDateObj.setDate(prevDateObj.getDate() - 1);
             const prevDateStr = prevDateObj.toISOString().split('T')[0];
 
-            let selectedTotalDelta = 0;
-            let prevTotalDelta = 0;
-            
-            if (dataMap[selectedDate]) {
-                Object.values(dataMap[selectedDate]).forEach(d => {
-                    if (d.powerDelta) selectedTotalDelta += d.powerDelta;
-                });
-            }
-            if (dataMap[prevDateStr]) {
-                Object.values(dataMap[prevDateStr]).forEach(d => {
-                    if (d.powerDelta) prevTotalDelta += d.powerDelta;
-                });
-            }
-            
-            function fmtW(v) { return (v / 10000).toFixed(1) + 'w'; }
-            document.getElementById('tableSumStats').innerText = 
-                `${prevDateStr} 总增幅: ${fmtW(prevTotalDelta)}\n${selectedDate} 总增幅: ${fmtW(selectedTotalDelta)}`;
             document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
 
             let dayDataList = [];
@@ -315,7 +280,7 @@
             tbody.innerHTML = '';
 
             if (latestRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">暂无数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">暂无数据</td></tr>';
             } else {
                 latestRows.forEach(row => {
                     const tr = document.createElement('tr');
@@ -327,6 +292,8 @@
                         <td>${formatDelta(row.powerDelta)}</td>
                         <td class="val-total">${formatNum(row.totalPower)}</td>
                         <td>${formatDelta(row.totalDelta)}</td>
+                        <td class="val-people">${formatNum(row.people)}</td>
+                        <td>${formatDelta(row.peopleDelta)}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -351,39 +318,19 @@
             const powerSeries = [];
             
             if (dataMap[selectedDate]) {
-                heartSeries.push({
-                    name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'heart'),
-                    smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
-                });
-                powerSeries.push({
-                    name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'powerDelta'),
-                    smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 }
-                });
+                heartSeries.push({ name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 } });
+                powerSeries.push({ name: selectedDate, type: 'line', data: getSeriesData(selectedDate, 'power'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 } });
             }
             if (dataMap[prevDateStr]) {
-                heartSeries.push({
-                    name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'heart'),
-                    smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
-                });
-                powerSeries.push({
-                    name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'powerDelta'),
-                    smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 }
-                });
+                heartSeries.push({ name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
+                powerSeries.push({ name: prevDateStr, type: 'line', data: getSeriesData(prevDateStr, 'power'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
             }
 
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
-                heartSeries.push({
-                    name: date.substring(5), type: 'line', data: getSeriesData(date, 'heart'),
-                    smooth: false, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' },
-                    emphasis: { disabled: true }
-                });
-                powerSeries.push({
-                    name: date.substring(5), type: 'line', data: getSeriesData(date, 'powerDelta'),
-                    smooth: false, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' },
-                    emphasis: { disabled: true }
-                });
+                heartSeries.push({ name: date.substring(5), type: 'line', data: getSeriesData(date, 'heart'), smooth: false, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' }, emphasis: { disabled: true } });
+                powerSeries.push({ name: date.substring(5), type: 'line', data: getSeriesData(date, 'power'), smooth: false, symbol: 'none', lineStyle: { color: '#b0b0b0', width: 1.5, type: 'dashed' }, emphasis: { disabled: true } });
             });
 
             chartHeart.hideLoading();
@@ -399,18 +346,4 @@
             chartPower.hideLoading();
             chartPower.setOption({
                 tooltip: { trigger: 'axis', confine: true },
-                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '0%', right: '0%', bottom: '10%', top: '15%', containLabel: true },
-                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
-                yAxis: { type: 'value', name: '增幅', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 1000000 ? (v / 1000000).toFixed(1) + 'm' : v; } } },
-                series: powerSeries
-            }, true);
-        }
-
-        window.addEventListener('resize', function() {
-            chartHeart.resize();
-            chartPower.resize();
-        });
-    </script>
-</body>
-</html>
+                legend: { top: '0%', itemWidth: 12, itemHeight: 8,
