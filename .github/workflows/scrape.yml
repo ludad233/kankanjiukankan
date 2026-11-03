@@ -1,7 +1,6 @@
 name: 自动抓取电力数据
 
 on:
-  # 删除了 schedule（避免和 cron-job 撞车）
   workflow_dispatch:     # 保留手动点击按钮
   repository_dispatch:   # 保留 cron-job.org 的外部唤醒
 
@@ -38,5 +37,5 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "自动更新数据"
-          # 只保留确定存在的文件，移除了 history/*.png，避免报错
-          file_pattern: "power_data.csv comparison_chart.png"
+          # 【核心关键】：必须加上 history/*.png，否则每天的存档图不会被上传！
+          file_pattern: "power_data.csv comparison_chart.png history/*.png"
