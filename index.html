@@ -41,7 +41,6 @@
             box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
         }
 
-        /* 表格容器 */
         .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
         .table-scroll-box::-webkit-scrollbar { display: none; }
         
@@ -50,14 +49,10 @@
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
         h3 { text-align: center; color: #333; margin: 0 0 10px 0; font-size: 15px; }
 
-        /* 【修改点】表格整体宽度缩小到 620px，滑动幅度减半 */
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
-        
-        /* 【修改点】减小单元格左右 padding，把空间让给数字 */
         th, td { padding: 10px 4px; text-align: right; border-bottom: 1px solid #eee; white-space: nowrap; }
         th { background-color: #fdf2e9; color: #d35400; font-weight: bold; text-align: center; font-size: 12px; position: sticky; top: 0; }
         
-        /* 固定首列（时间） */
         th:first-child, td:first-child { 
             padding-left: 8px; 
             padding-right: 8px;
@@ -73,13 +68,13 @@
         
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
-        .val-total { font-weight: bold; color: #D81B60; } 
+        /* 【修改点】总电力值改为黑色 */
+        .val-total { font-weight: bold; color: #333; } 
         .val-people { font-weight: bold; color: #8E44AD; }
         
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
         
-        /* 自定义 Tooltip 样式 */
         .custom-tooltip-title { font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #333; }
         .custom-tooltip-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 13px; color: #666; }
         .custom-tooltip-val { font-weight: bold; color: #333; margin-left: 10px; }
