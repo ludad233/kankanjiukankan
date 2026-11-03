@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>电力值数据追踪</title> <!-- 修改了网页标签名 -->
+    <title>电力值数据追踪</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         body {
@@ -17,15 +17,14 @@
             margin-bottom: 12px; padding: 12px 0; overflow: hidden;
         }
         
-        /* 新增的页面主标题样式 */
         .page-header {
             text-align: center;
             color: #D35400;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: bold;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             margin-top: 10px;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
         }
 
         .header-bar { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; gap: 10px; }
@@ -34,12 +33,11 @@
             border: 1px solid #FFB27A; border-radius: 8px; padding: 8px 12px; outline: none; appearance: none;
         }
         
-        /* 增幅胶囊样式 */
         .stats-wrap { text-align: center; margin-bottom: 5px; padding: 0 10px; }
         .stats {
-            text-align: center; font-size: 14px; font-weight: bold; color: #D35400;
+            text-align: center; font-size: 13px; font-weight: bold; color: #D35400;
             background: #FDF2E9; border: 1px solid #FFB27A; border-radius: 20px;
-            padding: 6px 20px; display: inline-block; line-height: 1.4;
+            padding: 6px 15px; display: inline-block; line-height: 1.4;
             box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
         }
 
@@ -47,7 +45,9 @@
         .table-scroll-box::-webkit-scrollbar { display: none; }
         .chart-scroll-box { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         .chart-scroll-box::-webkit-scrollbar { display: none; }
-        .chart-wrapper { width: 900px; height: 350px; }
+        
+        /* 【核心修改】把 900px 砍成 450px，手机上可以一屏展示 */
+        .chart-wrapper { width: 450px; height: 320px; }
         
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
         h3 { text-align: center; color: #333; margin: 0 0 10px 0; font-size: 15px; }
@@ -69,7 +69,6 @@
 </head>
 <body>
     <div class="container">
-        <!-- 页面主标题 -->
         <div class="page-header">电力值数据追踪</div>
 
         <div class="card" style="padding: 10px 0; text-align: center;">
@@ -77,7 +76,6 @@
                 <span>选择查看日期：</span>
                 <select id="dateSelector" class="date-select"></select>
             </div>
-            <!-- 今日增幅总计 -->
             <div class="stats-wrap">
                 <div class="stats" id="tableSumStats">总计计算中...</div>
             </div>
@@ -110,13 +108,13 @@
 
         <!-- 图表区域 -->
         <div class="card">
-            <div class="title">心动人数 & 总人数 (👈左右滑动👉)</div>
+            <div class="title">心动人数 & 总人数</div>
             <div class="chart-scroll-box"><div class="chart-wrapper" id="chartHeart"></div></div>
         </div>
 
         <div class="card">
-            <div class="title">团建电力增幅趋势 (👈左右滑动👉)</div>
-            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 300px;"></div></div>
+            <div class="title">团建电力增幅趋势</div>
+            <div class="chart-scroll-box"><div class="chart-wrapper" id="chartPower" style="height: 280px;"></div></div>
         </div>
     </div>
 
@@ -221,9 +219,7 @@
             const shortSelectedDate = selectedDate.substring(5);
             const shortPrevDate = prevDateStr.substring(5);
 
-            // 计算今日总增幅
             let todayTotalDelta = 0;
-            
             if (dataMap[selectedDate]) {
                 Object.values(dataMap[selectedDate]).forEach(d => {
                     if (d.powerDelta) todayTotalDelta += d.powerDelta;
@@ -292,9 +288,9 @@
                     data: getSeriesData(selectedDate, 'heart'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 4, 
+                    symbolSize: 3, // 手机端稍微缩小圆点
                     itemStyle: { color: '#FF8C42' }, 
-                    lineStyle: { color: '#FF8C42', width: 2.5 } 
+                    lineStyle: { color: '#FF8C42', width: 2 } 
                 });
             }
             if (dataMap[prevDateStr]) {
@@ -304,9 +300,9 @@
                     data: getSeriesData(prevDateStr, 'heart'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 4, 
+                    symbolSize: 3, 
                     itemStyle: { color: '#FFB3C6' }, 
-                    lineStyle: { color: '#FFB3C6', width: 2 } 
+                    lineStyle: { color: '#FFB3C6', width: 1.5 } 
                 });
             }
 
@@ -333,20 +329,25 @@
                     data: getSeriesData(selectedDate, 'people'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 4, 
+                    symbolSize: 3, 
                     itemStyle: { color: '#8E44AD' }, 
-                    lineStyle: { color: '#8E44AD', width: 2.5 } 
+                    lineStyle: { color: '#8E44AD', width: 2 } 
                 });
             }
 
             chartHeart.hideLoading();
             chartHeart.setOption({
                 tooltip: { trigger: 'axis', confine: true },
-                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '60px', right: '60px', bottom: '10%', top: '15%' },
-                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
+                legend: { top: '0%', itemWidth: 10, itemHeight: 6, textStyle: { fontSize: 10 }, type: 'scroll' }, // 手机端图例缩小
+                grid: { left: '40px', right: '40px', bottom: '10%', top: '20%' }, // 边距缩小
+                xAxis: { 
+                    type: 'category', 
+                    boundaryGap: false, 
+                    data: xAxisHours, 
+                    axisLabel: { interval: 3, fontSize: 10 } // 手机端每隔 3 小时显示一次时间，防止重叠
+                },
                 yAxis: [
-                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
+                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 10, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
                     { type: 'value', name: '人数', scale: true, splitLine: { show: false }, axisLabel: { show: false } }
                 ],
                 series: heartSeries
@@ -362,9 +363,9 @@
                     data: getSeriesData(selectedDate, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 4, 
+                    symbolSize: 3, 
                     itemStyle: { color: '#FF8C42' }, 
-                    lineStyle: { color: '#FF8C42', width: 2.5 } 
+                    lineStyle: { color: '#FF8C42', width: 2 } 
                 });
             }
             if (dataMap[prevDateStr]) {
@@ -374,9 +375,9 @@
                     data: getSeriesData(prevDateStr, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
-                    symbolSize: 4, 
+                    symbolSize: 3, 
                     itemStyle: { color: '#FFB3C6' }, 
-                    lineStyle: { color: '#FFB3C6', width: 2 } 
+                    lineStyle: { color: '#FFB3C6', width: 1.5 } 
                 });
             }
 
@@ -397,14 +398,19 @@
             chartPower.hideLoading();
             chartPower.setOption({
                 tooltip: { trigger: 'axis', confine: true },
-                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '60px', right: '60px', bottom: '10%', top: '15%' },
-                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
+                legend: { top: '0%', itemWidth: 10, itemHeight: 6, textStyle: { fontSize: 10 }, type: 'scroll' },
+                grid: { left: '40px', right: '40px', bottom: '10%', top: '20%' },
+                xAxis: { 
+                    type: 'category', 
+                    boundaryGap: false, 
+                    data: xAxisHours, 
+                    axisLabel: { interval: 3, fontSize: 10 } 
+                },
                 yAxis: { 
                     type: 'value', 
                     name: '增幅', 
                     scale: true, 
-                    axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } 
+                    axisLabel: { fontSize: 10, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } 
                 },
                 series: powerSeries
             }, true);
