@@ -63,7 +63,7 @@
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
         .val-total { font-weight: bold; color: #333; } 
-        /* 【修改点】发电总人数改为深粉色 */
+        /* 发电总人数表格颜色：深粉色 */
         .val-people { font-weight: bold; color: #D81B60; }
         
         .up { color: #e74c3c; font-weight: bold; }
@@ -116,7 +116,7 @@
 
         <!-- 图表区域 -->
         <div class="card">
-            <div class="title">心动人数 & 总人数</div>
+            <div class="title">心动人数趋势</div>
             <div style="width: 100%;"><div class="chart-wrapper" id="chartHeart"></div></div>
         </div>
 
@@ -286,7 +286,7 @@
                 });
             }
 
-            // ============ 图1：心动人数 & 发电人数 ============
+            // ============ 图1：心动人数趋势 ============
             const heartSeries = [];
             
             if (dataMap[selectedDate]) {
@@ -329,20 +329,7 @@
                 });
             });
 
-            if (dataMap[selectedDate]) {
-                heartSeries.push({ 
-                    name: shortSelectedDate + ' 总人数', 
-                    type: 'line', 
-                    yAxisIndex: 1, 
-                    data: getSeriesData(selectedDate, 'people'), 
-                    smooth: false, 
-                    symbol: 'circle', 
-                    symbolSize: 4, 
-                    /* 【修改点】折线改为深粉色 */
-                    itemStyle: { color: '#D81B60' }, 
-                    lineStyle: { color: '#D81B60', width: 2.5 } 
-                });
-            }
+            // 【删除点】去掉了总人数的紫线
 
             chartHeart.hideLoading();
             chartHeart.setOption({
@@ -363,13 +350,9 @@
                             let dataObj = dataMap[dateStr] && dataMap[dateStr][timeStr];
                             
                             if (dataObj) {
-                                if (p.seriesName.includes('心动') && !p.seriesName.includes('总人数')) {
+                                if (p.seriesName.includes('心动')) {
                                     if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
-                                    }
-                                } else if (p.seriesName.includes('总人数')) {
-                                    if (dataObj.peopleDelta !== null && dataObj.peopleDelta !== undefined) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.peopleDelta.toLocaleString()}</span>`;
                                     }
                                 }
                             }
@@ -399,8 +382,7 @@
                     axisLabel: { interval: 3, fontSize: 10 } 
                 },
                 yAxis: [
-                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
-                    { type: 'value', name: '人数', scale: true, splitLine: { show: false }, axisLabel: { show: false } }
+                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }
                 ],
                 series: heartSeries
             }, true);
