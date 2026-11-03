@@ -15,7 +15,8 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
 # ============ 配置 ============
-URL_TEAM1 = "https://y.qq.com/tmead/promotion/h5/team-activity/detail?_hidehd=1&_miniplayer=1&adtag=sszd&singerId=6665073&activityId=17931826095559&searchid=113943832761792946,&hosteuin=ow657wSlownlon**&ADTAG=wxfshare"
+# 已替换为最新一期的团建链接
+URL_TEAM1 = "https://y.qq.com/tmead/promotion/h5/team-activity/detail?_hidehd=1&_miniplayer=1&adtag=img_share&singerId=6665073&activityId=17936311664035&searchid=568305526626555693,&p_share=waFlj7ebDqqbQF2OOC4PsiQYhkYZ9aIFBalaGNW5ISE&ADTAG=wxfshare&hosteuin=oiEq7e6k7Knqon**"
 URL_TEAM2 = None
 URL_POWER = "https://y.qq.com/tmead/promotion/h5/powering/1793152992875?_hidehd=1&_miniplayer=1&adtag=share_task&singerId=6665073&p_share=w2pZEizuC5V-xTHRIivoTwD_5f_DMRfGNgTtS7isP_4&hosteuin=oiEqow6FoiCA7n**&ADTAG=wxfshare"
 
@@ -145,6 +146,7 @@ def parse_dt_loose(s):
     return None
 
 
+# 智能向上追溯：如果上一个小时没数据，就往前找最多 12 个小时
 def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
