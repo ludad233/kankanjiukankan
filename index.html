@@ -22,6 +22,15 @@
             border: 1px solid #FFB27A; border-radius: 8px; padding: 8px 12px; outline: none; appearance: none;
         }
         
+        /* 恢复的总增幅胶囊样式 */
+        .stats-wrap { text-align: center; margin-bottom: 5px; padding: 0 10px; }
+        .stats {
+            text-align: center; font-size: 13px; font-weight: bold; color: #555;
+            background: #FDF2E9; border: 1px solid #FFB27A; border-radius: 20px;
+            padding: 6px 15px; display: inline-block; line-height: 1.4;
+            box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
+        }
+
         .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .table-scroll-box::-webkit-scrollbar { display: none; }
         .chart-scroll-box { width: 100%; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
@@ -44,12 +53,6 @@
         
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
-        
-        /* 自定义 Tooltip 样式 */
-        .custom-tooltip-title { font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #333; }
-        .custom-tooltip-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 13px; color: #666; }
-        .custom-tooltip-val { font-weight: bold; color: #333; margin-left: 10px; }
-        .custom-tooltip-delta { margin-left: 6px; font-size: 11px; }
     </style>
 </head>
 <body>
@@ -58,6 +61,10 @@
             <div class="header-bar">
                 <span>选择查看日期：</span>
                 <select id="dateSelector" class="date-select"></select>
+            </div>
+            <!-- 恢复的增幅总计显示区 -->
+            <div class="stats-wrap">
+                <div class="stats" id="tableSumStats">总计计算中...</div>
             </div>
         </div>
 
@@ -199,6 +206,25 @@
             const shortSelectedDate = selectedDate.substring(5);
             const shortPrevDate = prevDateStr.substring(5);
 
+            // 【修复点】计算今日和昨日的总增幅
+            let todayTotalDelta = 0;
+            let prevTotalDelta = 0;
+            
+            if (dataMap[selectedDate]) {
+                Object.values(dataMap[selectedDate]).forEach(d => {
+                    if (d.powerDelta) todayTotalDelta += d.powerDelta;
+                });
+            }
+            if (dataMap[prevDateStr]) {
+                Object.values(dataMap[prevDateStr]).forEach(d => {
+                    if (d.powerDelta) prevTotalDelta += d.powerDelta;
+                });
+            }
+            
+            // 写入胶囊标签
+            document.getElementById('tableSumStats').innerText = 
+                `${shortPrevDate} 团建总增幅: ${fmtW(prevTotalDelta)} | ${shortSelectedDate} 团建总增幅: ${fmtW(todayTotalDelta)}`;
+
             document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
 
             let dayDataList = [];
@@ -307,52 +333,7 @@
 
             chartHeart.hideLoading();
             chartHeart.setOption({
-                tooltip: { 
-                    trigger: 'axis', 
-                    confine: true,
-                    // 【核心修改】自定义 Tooltip
-                    formatter: function (params) {
-                        let timeStr = params[0].axisValue;
-                        let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
-                        
-                        params.forEach(p => {
-                            let valStr = p.value !== null ? Number(p.value).toLocaleString() : '-';
-                            let deltaVal = '';
-                            
-                            // 根据 Series Name 匹配对应的增量字段
-                            let dateStr = selectedDate;
-                            if(p.seriesName.includes(prevDateStr.substring(5))) dateStr = prevDateStr;
-                            
-                            let dataObj = dataMap[dateStr] && dataMap[dateStr][timeStr];
-                            
-                            if (dataObj) {
-                                if (p.seriesName.includes('心动') && !p.seriesName.includes('总人数')) {
-                                    if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
-                                    }
-                                } else if (p.seriesName.includes('总人数')) {
-                                    if (dataObj.peopleDelta !== null && dataObj.peopleDelta !== undefined) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.peopleDelta.toLocaleString()}</span>`;
-                                    }
-                                }
-                            }
-                            
-                            html += `
-                                <div class="custom-tooltip-item">
-                                    <div style="display:flex; align-items:center;">
-                                        ${p.marker}
-                                        <span style="margin-left:4px;">${p.seriesName}</span>
-                                    </div>
-                                    <div>
-                                        <span class="custom-tooltip-val">${valStr}</span>
-                                        ${deltaVal}
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        return html;
-                    }
-                },
+                tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '60px', right: '60px', bottom: '10%', top: '15%' },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 0, fontSize: 11 } },
