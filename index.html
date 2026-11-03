@@ -22,12 +22,12 @@
             border: 1px solid #FFB27A; border-radius: 8px; padding: 8px 12px; outline: none; appearance: none;
         }
         
-        /* 恢复的总增幅胶囊样式 */
+        /* 增幅胶囊样式 */
         .stats-wrap { text-align: center; margin-bottom: 5px; padding: 0 10px; }
         .stats {
-            text-align: center; font-size: 13px; font-weight: bold; color: #555;
+            text-align: center; font-size: 14px; font-weight: bold; color: #D35400;
             background: #FDF2E9; border: 1px solid #FFB27A; border-radius: 20px;
-            padding: 6px 15px; display: inline-block; line-height: 1.4;
+            padding: 6px 20px; display: inline-block; line-height: 1.4;
             box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
         }
 
@@ -62,7 +62,7 @@
                 <span>选择查看日期：</span>
                 <select id="dateSelector" class="date-select"></select>
             </div>
-            <!-- 恢复的增幅总计显示区 -->
+            <!-- 只留今日的增幅总计 -->
             <div class="stats-wrap">
                 <div class="stats" id="tableSumStats">总计计算中...</div>
             </div>
@@ -206,24 +206,18 @@
             const shortSelectedDate = selectedDate.substring(5);
             const shortPrevDate = prevDateStr.substring(5);
 
-            // 【修复点】计算今日和昨日的总增幅
+            // 计算今日总增幅
             let todayTotalDelta = 0;
-            let prevTotalDelta = 0;
             
             if (dataMap[selectedDate]) {
                 Object.values(dataMap[selectedDate]).forEach(d => {
                     if (d.powerDelta) todayTotalDelta += d.powerDelta;
                 });
             }
-            if (dataMap[prevDateStr]) {
-                Object.values(dataMap[prevDateStr]).forEach(d => {
-                    if (d.powerDelta) prevTotalDelta += d.powerDelta;
-                });
-            }
             
-            // 写入胶囊标签
+            // 【修改点】只写入今日的胶囊标签
             document.getElementById('tableSumStats').innerText = 
-                `${shortPrevDate} 团建总增幅: ${fmtW(prevTotalDelta)} | ${shortSelectedDate} 团建总增幅: ${fmtW(todayTotalDelta)}`;
+                `${shortSelectedDate} 团建总增幅: ${fmtW(todayTotalDelta)}`;
 
             document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
 
