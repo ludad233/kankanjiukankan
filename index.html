@@ -126,23 +126,12 @@
     </div>
 
     <script>
-        function parseTimeStr(str) {
-            if (!str) return "";
-            let parts = str.split(' ');
-            if (parts.length > 1) {
-                let timeParts = parts[1].split(':');
-                if (timeParts.length >= 1) {
-                    let hour = parseInt(timeParts[0], 10);
-                    return (hour < 10 ? '0' + hour : hour) + ':00';
-                }
-            }
-            return str;
+        function formatNum(num) { 
+            if (num === 0) return '0';
+            return num ? Number(num).toLocaleString() : '-'; 
         }
-
-        function formatNum(num) { return num ? Number(num).toLocaleString() : '-'; }
         
         function formatDelta(num) {
-            // 【修复】如果数值是 0，直接显示 0
             if (num === 0) return '0';
             if (num === null || num === undefined || num === '' || isNaN(num)) return '-';
             const val = Number(num);
@@ -183,9 +172,10 @@
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
-                    if (formattedDate < '2026-11-01') return;
-
-                    const timeHour = parseTimeStr(timeStr);
+                    let timeParts = timeStr.split(' ')[1].split(':');
+                    let hour = parseInt(timeParts[0], 10);
+                    let timeHour = (hour < 10 ? '0' + hour : hour) + ':00';
+                    
                     datesSet.add(formattedDate);
 
                     const rowData = {
@@ -238,7 +228,6 @@
                 let showHeartDelta = row.heartDelta;
                 let timeDisplay = row.rawTime.split(' ')[1];
                 
-                // 【修复】强制把 0:00 和 00:00 的增幅设为 0
                 if(timeDisplay === '0:00' || timeDisplay === '00:00') {
                     showHeart = 0;
                     showHeartDelta = 0;
@@ -283,16 +272,13 @@
                 xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
             }
 
-            // 【核心修复】用纯字符串算下一天，绝不经过 Date 对象，避免时区误差
             function getNextDateStr(dateStr) {
                 let parts = dateStr.split('-');
                 let y = parseInt(parts[0]);
                 let m = parseInt(parts[1]);
                 let d = parseInt(parts[2]);
-
                 let dt = new Date(y, m - 1, d);
                 dt.setDate(dt.getDate() + 1);
-                
                 let ny = dt.getFullYear();
                 let nm = ('0' + (dt.getMonth() + 1)).slice(-2);
                 let nd = ('0' + dt.getDate()).slice(-2);
@@ -301,9 +287,11 @@
 
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
+                    // 如果是今天 0 点，全部强制写 0
                     if (date === selectedDate && h === '00:00') {
-                        if(key === 'heart') return 0;
-                        if(key === 'heartDelta') return 0;
+                        if(key === 'heart' || key === 'heartDelta' || key === 'powerDelta') {
+                            return 0;
+                        }
                     }
                     
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
@@ -312,12 +300,12 @@
                     return null;
                 });
 
-                // 强行借位
+                // 把明天的 00:00 数据，直接物理复制到今天的 24:00
                 if (arr[24] === null || arr[24] === undefined) {
                     const nextDayStr = getNextDateStr(date);
                     let nextData = null;
                     if (dataMap[nextDayStr]) {
-                        nextData = dataMap[nextDayStr]['00:00'] || dataMap[nextDayStr]['0:00'];
+                        nextData = dataMap[nextDayStr]['00:00'];
                     }
                     
                     if (nextData) {
@@ -394,11 +382,14 @@
                                 }
                             }
 
-                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime] || dataMap[dateStr][lookupTime.replace(':00',':00')]);
+                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
+                                    // 图上如果是今天0点或者昨天24点，增幅强制为0显示
+                                    if (timeStr === '00:00' || timeStr === '24:00') {
+                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                    } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
                                     }
                                 }
@@ -493,11 +484,13 @@
                                 }
                             }
 
-                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime] || dataMap[dateStr][lookupTime.replace(':00',':00')]);
+                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
-                                    if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                    if (timeStr === '00:00') {
+                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                    } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
                                     }
                                 }
