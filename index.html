@@ -175,8 +175,8 @@
                 const lines = csv.trim().split('\n').slice(1);
                 const datesSet = new Set();
 
-                // 【核心修复】按日期存上一次有效数据，绝对不跨天乱算
-                let lastValidDataByDate = {};
+                // 【彻底防串线】记录每一个日期自己的“上一个数据”
+                let dailyLastValidData = {}; 
 
                 lines.forEach(line => {
                     const cols = line.split(',');
@@ -189,7 +189,8 @@
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
-                    if (formattedDate < '2026-11-01') return; 
+                    // 取消 11 月 1 日的限制，防止吞数据
+                    // if (formattedDate < '2026-11-01') return; 
 
                     let timeParts = timeStr.split(' ')[1].split(':');
                     let hour = parseInt(timeParts[0], 10);
@@ -202,9 +203,9 @@
                     const totalPower = Number(cols[5]) || null;
                     const people = Number(cols[7]) || null;
 
-                    // 只跟同一天的上一条数据比
-                    let lastValid = lastValidDataByDate[formattedDate];
-                    
+                    // 提取当天该小时的前一个有效数据
+                    let lastValid = dailyLastValidData[formattedDate];
+
                     let heartDelta = null;
                     let powerDelta = null;
                     let totalDelta = null;
@@ -216,13 +217,14 @@
                         if (totalPower !== null && lastValid.totalPower !== null) totalDelta = totalPower - lastValid.totalPower;
                         if (people !== null && lastValid.people !== null) peopleDelta = people - lastValid.people;
                     } else if (timeHour === '00:00') {
-                        // 0 点强制为 0
+                        // 0 点强制增幅为 0
                         heartDelta = 0;
                         powerDelta = 0;
                         totalDelta = 0;
                         peopleDelta = 0;
                     }
 
+                    // 为了图表在 0 点能成功触底，强制当前心动为 0
                     let finalHeart = (timeHour === '00:00') ? 0 : heart;
 
                     const rowData = {
@@ -242,9 +244,9 @@
                     if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
                     globalDataMap[formattedDate][timeHour] = rowData;
 
-                    // 记录当前日期下的最新有效数据
+                    // 只要这行抓到了数据，就记录下来给当天的下个小时用
                     if (heart !== null || power !== null) {
-                        lastValidDataByDate[formattedDate] = {
+                        dailyLastValidData[formattedDate] = {
                             heart: finalHeart, 
                             power: power,
                             totalPower: totalPower,
@@ -253,6 +255,7 @@
                     }
                 });
 
+                // 渲染全局最新的 10 条数据
                 renderGlobalTable(globalAllRows.slice(-10).reverse());
 
                 const sortedDates = Array.from(datesSet).sort().reverse(); 
@@ -435,9 +438,9 @@
                 });
             }
 
+            // 这里取消硬编码限制，把历史灰线加回来
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
-                if (date < '2026-11-01') return; 
                 if (date === selectedDate || date === prevDateStr) return;
                 heartSeries.push({ 
                     name: date.substring(5) + ' 心动', 
@@ -559,7 +562,6 @@
             }
 
             allDates.forEach(date => {
-                if (date < '2026-11-01') return; 
                 if (date === selectedDate || date === prevDateStr) return;
                 powerSeries.push({ 
                     name: date.substring(5) + ' 团建增幅', 
