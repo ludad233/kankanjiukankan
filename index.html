@@ -80,7 +80,7 @@
 
         <div class="card" style="padding: 10px 0; text-align: center;">
             <div class="header-bar">
-                <span>选择查看日期：</span>
+                <span>选择查看图表日期：</span>
                 <select id="dateSelector" class="date-select"></select>
             </div>
             <div class="stats-wrap">
@@ -90,7 +90,7 @@
 
         <!-- 表格区域 -->
         <div class="card">
-            <h3 id="tableTitle">数据明细</h3>
+            <h3 id="tableTitle">全局最新 10 条数据明细</h3>
             <div class="table-scroll-box">
                 <table id="dataTable">
                     <thead>
@@ -159,6 +159,7 @@
         chartHeart.showLoading(); chartPower.showLoading();
 
         let globalDataMap = {}; 
+        let globalAllRows = []; // 【新增】用来存储所有解析后的原始数据行，供全局表格使用
 
         fetch('power_data.csv?t=' + new Date().getTime())
             .then(res => {
@@ -185,9 +186,8 @@
                     const timeHour = parseTimeStr(timeStr);
                     datesSet.add(formattedDate);
 
-                    if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
-                    
-                    globalDataMap[formattedDate][timeHour] = {
+                    const rowData = {
+                        rawTime: timeStr,
                         heart: Number(cols[1]) || null,
                         heartDelta: cols[2] !== '' ? Number(cols[2]) : null,
                         power: Number(cols[3]) || null,
@@ -197,7 +197,18 @@
                         people: Number(cols[7]) || null,
                         peopleDelta: cols[8] !== '' ? Number(cols[8]) : null
                     };
+
+                    // 存一份全局数组
+                    globalAllRows.push(rowData);
+
+                    // 存一份按日期分类的 Map
+                    if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
+                    globalDataMap[formattedDate][timeHour] = rowData;
                 });
+
+                // 【核心修改】直接把全局最新的 10 条塞进表格，不再受选中的日期影响
+                // 因为 globalAllRows 是按 CSV 顺序（从早到晚）读取的，倒序取前 10 个就是最新 10 条
+                renderGlobalTable(globalAllRows.slice(-10).reverse());
 
                 const sortedDates = Array.from(datesSet).sort().reverse(); 
                 const selector = document.getElementById('dateSelector');
@@ -216,17 +227,45 @@
                 document.querySelector('#dataTable tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:red;">读取失败，请确保 power_data.csv 已重新生成。</td></tr>';
             });
 
+        // 渲染全局最新表格
+        function renderGlobalTable(latestRows) {
+            const tbody = document.querySelector('#dataTable tbody');
+            tbody.innerHTML = '';
+            if (latestRows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">暂无数据</td></tr>';
+                return;
+            }
+            latestRows.forEach(row => {
+                const tr = document.createElement('tr');
+                let showHeart = row.heart;
+                let showHeartDelta = row.heartDelta;
+                let timeDisplay = row.rawTime.split(' ')[1];
+                
+                if(timeDisplay === '0:00' || timeDisplay === '00:00') {
+                    showHeart = 0;
+                    showHeartDelta = 0;
+                }
+                tr.innerHTML = `
+                    <td>${row.rawTime}</td>
+                    <td class="val-heart">${formatNum(showHeart)}</td>
+                    <td>${formatDelta(showHeartDelta)}</td>
+                    <td class="val-power">${formatNum(row.power)}</td>
+                    <td>${formatDelta(row.powerDelta)}</td>
+                    <td class="val-total">${formatNum(row.totalPower)}</td>
+                    <td>${formatDelta(row.totalDelta)}</td>
+                    <td class="val-people">${formatNum(row.people)}</td>
+                    <td>${formatDelta(row.peopleDelta)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
         function renderPage(selectedDate) {
             const dataMap = globalDataMap;
             const selDateObj = new Date(selectedDate);
             const prevDateObj = new Date(selDateObj);
             prevDateObj.setDate(prevDateObj.getDate() - 1);
             const prevDateStr = prevDateObj.toISOString().split('T')[0];
-
-            // 未来一天（为了取今天0点给昨天当24点）
-            const nextDateObj = new Date(selDateObj);
-            nextDateObj.setDate(nextDateObj.getDate() + 1);
-            const nextDateStr = nextDateObj.toISOString().split('T')[0];
 
             const shortSelectedDate = selectedDate.substring(5);
             const shortPrevDate = prevDateStr.substring(5);
@@ -241,53 +280,11 @@
             document.getElementById('tableSumStats').innerText = 
                 `${shortSelectedDate} 团建总增幅: ${fmtW(todayTotalDelta)}`;
 
-            document.getElementById('tableTitle').innerText = `${selectedDate} 数据明细 (最近10条)`;
-
-            let dayDataList = [];
-            if (dataMap[selectedDate]) {
-                for (const [time, data] of Object.entries(dataMap[selectedDate])) {
-                    dayDataList.push({ time, ...data });
-                }
-                dayDataList.sort((a, b) => b.time.localeCompare(a.time));
-            }
-            
-            const latestRows = dayDataList.slice(0, 10);
-            const tbody = document.querySelector('#dataTable tbody');
-            tbody.innerHTML = '';
-
-            if (latestRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">暂无数据</td></tr>';
-            } else {
-                latestRows.forEach(row => {
-                    const tr = document.createElement('tr');
-                    // 如果是今天 0 点，强行展示 0
-                    let showHeart = row.heart;
-                    let showHeartDelta = row.heartDelta;
-                    if(row.time === '00:00') {
-                        showHeart = 0;
-                        showHeartDelta = 0;
-                    }
-                    tr.innerHTML = `
-                        <td>${row.time}</td>
-                        <td class="val-heart">${formatNum(showHeart)}</td>
-                        <td>${formatDelta(showHeartDelta)}</td>
-                        <td class="val-power">${formatNum(row.power)}</td>
-                        <td>${formatDelta(row.powerDelta)}</td>
-                        <td class="val-total">${formatNum(row.totalPower)}</td>
-                        <td>${formatDelta(row.totalDelta)}</td>
-                        <td class="val-people">${formatNum(row.people)}</td>
-                        <td>${formatDelta(row.peopleDelta)}</td>
-                    `;
-                    tbody.appendChild(tr);
-                });
-            }
-
             const xAxisHours = [];
             for (let i = 0; i <= 24; i++) {
                 xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
             }
 
-            // 核心修改：取值时，如果是今天 0 点，强制返回 0
             function getSeriesData(date, key) {
                 return xAxisHours.map(h => {
                     if (date === selectedDate && h === '00:00') {
@@ -318,10 +315,7 @@
                 });
             }
             if (dataMap[prevDateStr]) {
-                // 昨天的心动数据
                 let prevHeartData = getSeriesData(prevDateStr, 'heart');
-                
-                // 【核心修改】如果今天存在 00:00 的数据，把它借给昨天的 24:00 作为最终结算
                 if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
                     prevHeartData[24] = dataMap[selectedDate]['00:00'].heart;
                 }
@@ -369,12 +363,11 @@
                             let dateStr = selectedDate;
                             if(p.seriesName.includes(prevDateStr.substring(5))) dateStr = prevDateStr;
                             
-                            // 处理 24:00 的特殊取值
                             let lookupTime = timeStr;
                             if (timeStr === '24:00' && dateStr === prevDateStr) {
-                                lookupTime = '00:00'; // 如果是昨天的24点，去查今天0点的数据
+                                lookupTime = '00:00';
                                 if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
-                                    dateStr = selectedDate; // 借用今天的
+                                    dateStr = selectedDate;
                                 }
                             }
 
@@ -406,15 +399,8 @@
                 },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
-                xAxis: { 
-                    type: 'category', 
-                    boundaryGap: false, 
-                    data: xAxisHours, 
-                    axisLabel: { interval: 3, fontSize: 10 } 
-                },
-                yAxis: [
-                    { type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }
-                ],
+                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 3, fontSize: 10 } },
+                yAxis: [{ type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }],
                 series: heartSeries
             }, true);
 
@@ -434,9 +420,7 @@
                 });
             }
             if (dataMap[prevDateStr]) {
-                // 昨天的增幅数据
                 let prevPowerData = getSeriesData(prevDateStr, 'powerDelta');
-                // 如果今天存在 00:00 的数据，借给昨天 24:00
                 if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
                     prevPowerData[24] = dataMap[selectedDate]['00:00'].powerDelta;
                 }
@@ -472,18 +456,8 @@
                 tooltip: { trigger: 'axis', confine: true },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
-                xAxis: { 
-                    type: 'category', 
-                    boundaryGap: false, 
-                    data: xAxisHours, 
-                    axisLabel: { interval: 3, fontSize: 10 } 
-                },
-                yAxis: { 
-                    type: 'value', 
-                    name: '增幅', 
-                    scale: true, 
-                    axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } 
-                },
+                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 3, fontSize: 10 } },
+                yAxis: { type: 'value', name: '增幅', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
                 series: powerSeries
             }, true);
         }
