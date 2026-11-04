@@ -172,8 +172,7 @@
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
-                    // 【核心修改】直接跳过 11 月 1 日之前的所有数据
-                    if (formattedDate < '2026-11-01') return;
+                    if (formattedDate < '2026-11-01') return; // 跳过 11月1日之前
 
                     let timeParts = timeStr.split(' ')[1].split(':');
                     let hour = parseInt(timeParts[0], 10);
@@ -346,7 +345,6 @@
 
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
-                // 【核心修改】如果是 11 月 1 日之前，直接跳过，不渲染灰色虚线
                 if (date < '2026-11-01') return; 
                 if (date === selectedDate || date === prevDateStr) return;
                 heartSeries.push({ 
@@ -371,7 +369,12 @@
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
                         
                         params.forEach(p => {
-                            let valStr = p.value !== null ? Number(p.value).toLocaleString() : '-';
+                            let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
+                            
+                            // 【核心修复】如果没有数据（NaN），连带着增幅也不要显示
+                            if (!isDataValid) return;
+
+                            let valStr = Number(p.value).toLocaleString();
                             let deltaVal = '';
                             
                             let dateStr = selectedDate;
@@ -449,7 +452,6 @@
             }
 
             allDates.forEach(date => {
-                // 【核心修改】如果是 11 月 1 日之前，直接跳过，不渲染灰色虚线
                 if (date < '2026-11-01') return; 
                 if (date === selectedDate || date === prevDateStr) return;
                 powerSeries.push({ 
@@ -474,7 +476,12 @@
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
                         
                         params.forEach(p => {
-                            let valStr = p.value !== null ? Number(p.value).toLocaleString() : '-';
+                            let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
+                            
+                            // 【核心修复】如果没有数据（NaN），直接不渲染
+                            if (!isDataValid) return;
+
+                            let valStr = Number(p.value).toLocaleString();
                             let deltaVal = '';
                             
                             let dateStr = selectedDate;
