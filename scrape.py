@@ -39,7 +39,6 @@ async def scrape_team(page, url):
     for attempt in range(max_retries):
         try:
             print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取团建数据...")
-            # 延长超时时间到 90 秒
             await page.goto(url, wait_until="domcontentloaded", timeout=90000)
 
             try:
@@ -87,7 +86,6 @@ async def scrape_power(page):
     for attempt in range(max_retries):
         try:
             print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取电力及人数...")
-            # 延长超时时间到 90 秒
             await page.goto(URL_POWER, wait_until="domcontentloaded", timeout=90000)
 
             try:
@@ -156,9 +154,11 @@ def parse_dt_loose(s):
 
 
 def get_prev_hour_record(curr_dt, all_rows):
+    # 格式化当前小时（例如 "2026/11/4 11"）
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
+    # 【核心修复】往前找最多 12 个小时，只匹配年月日和小时，避开具体分钟数的干扰
     for i in range(1, 13):
         prev_hour_dt = curr_dt - timedelta(hours=i)
         prev_hour_str = fmt_no_pad(prev_hour_dt)
@@ -168,6 +168,7 @@ def get_prev_hour_record(curr_dt, all_rows):
 
         for row in reversed(all_rows):
             if not row or len(row) < 10: continue
+            # 只要这一行的开头匹配到 "2026/11/4 10" 就行
             if row[0].startswith(prev_hour_str):
                 return row
     return None
@@ -318,7 +319,6 @@ async def run_once():
     now_bj = datetime.now() + timedelta(hours=8)
 
     async with async_playwright() as p:
-        # 添加启动参数，减少被识别为机器人的概率
         browser = await p.chromium.launch(
             headless=True,
             args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
