@@ -142,6 +142,8 @@
         function formatNum(num) { return num ? Number(num).toLocaleString() : '-'; }
         
         function formatDelta(num) {
+            // 【修复】如果数值是 0，直接显示 0
+            if (num === 0) return '0';
             if (num === null || num === undefined || num === '' || isNaN(num)) return '-';
             const val = Number(num);
             if (val > 0) return `<span class="up">+${val.toLocaleString()}</span>`;
@@ -236,6 +238,7 @@
                 let showHeartDelta = row.heartDelta;
                 let timeDisplay = row.rawTime.split(' ')[1];
                 
+                // 【修复】强制把 0:00 和 00:00 的增幅设为 0
                 if(timeDisplay === '0:00' || timeDisplay === '00:00') {
                     showHeart = 0;
                     showHeartDelta = 0;
@@ -280,15 +283,20 @@
                 xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
             }
 
-            // 【终极暴力修复】：手工计算明天的日期字符串
+            // 【核心修复】用纯字符串算下一天，绝不经过 Date 对象，避免时区误差
             function getNextDateStr(dateStr) {
                 let parts = dateStr.split('-');
-                let d = new Date(parts[0], parseInt(parts[1])-1, parseInt(parts[2]));
-                d.setDate(d.getDate() + 1);
-                let y = d.getFullYear();
-                let m = ('0' + (d.getMonth() + 1)).slice(-2);
-                let day = ('0' + d.getDate()).slice(-2);
-                return `${y}-${m}-${day}`;
+                let y = parseInt(parts[0]);
+                let m = parseInt(parts[1]);
+                let d = parseInt(parts[2]);
+
+                let dt = new Date(y, m - 1, d);
+                dt.setDate(dt.getDate() + 1);
+                
+                let ny = dt.getFullYear();
+                let nm = ('0' + (dt.getMonth() + 1)).slice(-2);
+                let nd = ('0' + dt.getDate()).slice(-2);
+                return `${ny}-${nm}-${nd}`;
             }
 
             function getSeriesData(date, key) {
@@ -304,11 +312,9 @@
                     return null;
                 });
 
-                // 【强行借位】
+                // 强行借位
                 if (arr[24] === null || arr[24] === undefined) {
                     const nextDayStr = getNextDateStr(date);
-                    
-                    // 兼容 0:00 和 00:00
                     let nextData = null;
                     if (dataMap[nextDayStr]) {
                         nextData = dataMap[nextDayStr]['00:00'] || dataMap[nextDayStr]['0:00'];
