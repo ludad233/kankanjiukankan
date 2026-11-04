@@ -110,7 +110,6 @@
     </div>
 
     <script>
-        // 提取精准到毫秒的防缓存
         const CACHE_BUSTER = 'v=' + new Date().getTime();
         
         function formatNum(num) { 
@@ -167,24 +166,18 @@
                     
                     datesSet.add(formattedDate);
 
+                    // 直接使用表格里的原始数据，不进行任何覆盖
                     const heart = Number(cols[1]) || null;
+                    const heartDelta = cols[2] !== '' ? Number(cols[2]) : null;
                     const power = Number(cols[3]) || null;
+                    const powerDelta = cols[4] !== '' ? Number(cols[4]) : null;
                     const totalPower = Number(cols[5]) || null;
+                    const totalDelta = cols[6] !== '' ? Number(cols[6]) : null;
                     const people = Number(cols[7]) || null;
-
-                    let heartDelta = cols[2] !== '' ? Number(cols[2]) : null;
-                    let powerDelta = cols[4] !== '' ? Number(cols[4]) : null;
-                    let totalDelta = cols[6] !== '' ? Number(cols[6]) : null;
-                    let peopleDelta = cols[8] !== '' ? Number(cols[8]) : null;
-
-                    if (timeHour === '00:00') {
-                        heartDelta = 0; powerDelta = 0; totalDelta = 0; peopleDelta = 0;
-                    }
-
-                    let finalHeart = (timeHour === '00:00') ? 0 : heart;
+                    const peopleDelta = cols[8] !== '' ? Number(cols[8]) : null;
 
                     const rowData = {
-                        rawTime: timeStr, heart: finalHeart, heartDelta: heartDelta,
+                        rawTime: timeStr, heart: heart, heartDelta: heartDelta,
                         power: power, powerDelta: powerDelta,
                         totalPower: totalPower, totalDelta: totalDelta,
                         people: people, peopleDelta: peopleDelta
@@ -224,17 +217,10 @@
             }
             latestRows.forEach(row => {
                 const tr = document.createElement('tr');
-                let showHeart = row.heart;
-                let showHeartDelta = row.heartDelta;
-                let timeDisplay = row.rawTime.split(' ')[1];
-                
-                if(timeDisplay === '0:00' || timeDisplay === '00:00') {
-                    showHeart = 0; showHeartDelta = 0;
-                }
                 tr.innerHTML = `
                     <td>${row.rawTime}</td>
-                    <td class="val-heart">${formatNum(showHeart)}</td>
-                    <td>${formatDelta(showHeartDelta)}</td>
+                    <td class="val-heart">${formatNum(row.heart)}</td>
+                    <td>${formatDelta(row.heartDelta)}</td>
                     <td class="val-power">${formatNum(row.power)}</td>
                     <td>${formatDelta(row.powerDelta)}</td>
                     <td class="val-total">${formatNum(row.totalPower)}</td>
@@ -283,11 +269,9 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
+            // 【核心修复】：直接读取表格数据，不强行归零
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    if (date === selectedDate && h === '00:00') {
-                        if(key === 'heart' || key === 'heartDelta' || key === 'powerDelta') return 0;
-                    }
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
                         return dataMap[date][h][key];
                     }
@@ -375,9 +359,8 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    if (timeStr === '00:00' || (timeStr === '24:00' && dateStr === selectedDate)) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
+                                    // 【核心修复】：直接读取表格增幅，不再强行判断 24 点
+                                    if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
                                     }
                                 }
@@ -452,9 +435,8 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
-                                    if (timeStr === '00:00') {
-                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                    // 【核心修复】：直接读取表格增幅，不强行归零
+                                    if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
                                     }
                                 }
