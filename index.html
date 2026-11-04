@@ -166,7 +166,6 @@
                     
                     datesSet.add(formattedDate);
 
-                    // 直接使用表格里的原始数据，不进行任何覆盖
                     const heart = Number(cols[1]) || null;
                     const heartDelta = cols[2] !== '' ? Number(cols[2]) : null;
                     const power = Number(cols[3]) || null;
@@ -269,7 +268,6 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
-            // 【核心修复】：直接读取表格数据，不强行归零
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
@@ -359,8 +357,10 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    // 【核心修复】：直接读取表格增幅，不再强行判断 24 点
-                                    if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
+                                    // 【终极强制】：只有当前看的是今天，且时间轴是 00:00，才显示 0
+                                    if (timeStr === '00:00' && dateStr === selectedDate) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                    } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
                                     }
                                 }
@@ -435,8 +435,10 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
-                                    // 【核心修复】：直接读取表格增幅，不强行归零
-                                    if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                    // 【终极强制】：只有当前看的是今天，且时间轴是 00:00，才显示 0
+                                    if (timeStr === '00:00' && dateStr === selectedDate) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                    } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
                                     }
                                 }
