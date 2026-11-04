@@ -281,7 +281,9 @@
             }
 
             function getSeriesData(date, key) {
-                return xAxisHours.map(h => {
+                // 将 00:00 - 24:00 的数据映射成数组
+                let arr = xAxisHours.map(h => {
+                    // 如果是今天 0 点，心动强制为0
                     if (date === selectedDate && h === '00:00') {
                         if(key === 'heart') return 0;
                         if(key === 'heartDelta') return 0;
@@ -292,6 +294,18 @@
                     }
                     return null;
                 });
+
+                // 【核心绝杀】如果这一天的 24:00 没有数据，去借下一天 00:00 的数据
+                if (arr[24] === null || arr[24] === undefined) {
+                    const nextDayObj = new Date(date);
+                    nextDayObj.setDate(nextDayObj.getDate() + 1);
+                    const nextDayStr = nextDayObj.toISOString().split('T')[0];
+                    
+                    if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00']) {
+                        arr[24] = dataMap[nextDayStr]['00:00'][key];
+                    }
+                }
+                return arr;
             }
 
             // ============ 图1：心动人数趋势 ============
@@ -310,16 +324,10 @@
                 });
             }
             if (dataMap[prevDateStr]) {
-                let prevHeartData = getSeriesData(prevDateStr, 'heart');
-                // 【强制连接 24 点】
-                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
-                    prevHeartData[24] = dataMap[selectedDate]['00:00'].heart;
-                }
-
                 heartSeries.push({ 
                     name: shortPrevDate + ' 心动', 
                     type: 'line', 
-                    data: prevHeartData, 
+                    data: getSeriesData(prevDateStr, 'heart'), 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
@@ -331,19 +339,10 @@
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
-                let histData = getSeriesData(date, 'heart');
-                // 历史日期的 24 点也连上
-                const nextD = new Date(date);
-                nextD.setDate(nextD.getDate() + 1);
-                const nextDateStr = nextD.toISOString().split('T')[0];
-                if (dataMap[nextDateStr] && dataMap[nextDateStr]['00:00']) {
-                    histData[24] = dataMap[nextDateStr]['00:00'].heart;
-                }
-
                 heartSeries.push({ 
                     name: date.substring(5) + ' 心动', 
                     type: 'line', 
-                    data: histData, 
+                    data: getSeriesData(date, 'heart'), 
                     smooth: false, 
                     symbol: 'none', 
                     itemStyle: { color: '#A0A0A0' },
@@ -425,16 +424,10 @@
                 });
             }
             if (dataMap[prevDateStr]) {
-                let prevPowerData = getSeriesData(prevDateStr, 'powerDelta');
-                // 【强制连接 24 点】
-                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
-                    prevPowerData[24] = dataMap[selectedDate]['00:00'].powerDelta;
-                }
-
                 powerSeries.push({ 
                     name: shortPrevDate + ' 团建增幅', 
                     type: 'line', 
-                    data: prevPowerData, 
+                    data: getSeriesData(prevDateStr, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
@@ -445,18 +438,10 @@
 
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
-                let histData = getSeriesData(date, 'powerDelta');
-                const nextD = new Date(date);
-                nextD.setDate(nextD.getDate() + 1);
-                const nextDateStr = nextD.toISOString().split('T')[0];
-                if (dataMap[nextDateStr] && dataMap[nextDateStr]['00:00']) {
-                    histData[24] = dataMap[nextDateStr]['00:00'].powerDelta;
-                }
-
                 powerSeries.push({ 
                     name: date.substring(5) + ' 团建增幅', 
                     type: 'line', 
-                    data: histData, 
+                    data: getSeriesData(date, 'powerDelta'), 
                     smooth: false, 
                     symbol: 'none', 
                     itemStyle: { color: '#A0A0A0' },
