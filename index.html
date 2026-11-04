@@ -280,6 +280,17 @@
                 xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
             }
 
+            // 【终极暴力修复】：手工计算明天的日期字符串
+            function getNextDateStr(dateStr) {
+                let parts = dateStr.split('-');
+                let d = new Date(parts[0], parseInt(parts[1])-1, parseInt(parts[2]));
+                d.setDate(d.getDate() + 1);
+                let y = d.getFullYear();
+                let m = ('0' + (d.getMonth() + 1)).slice(-2);
+                let day = ('0' + d.getDate()).slice(-2);
+                return `${y}-${m}-${day}`;
+            }
+
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
                     if (date === selectedDate && h === '00:00') {
@@ -293,14 +304,18 @@
                     return null;
                 });
 
-                // 强行借下一天 0 点数据填到 24 点
+                // 【强行借位】
                 if (arr[24] === null || arr[24] === undefined) {
-                    const nextDayObj = new Date(date);
-                    nextDayObj.setDate(nextDayObj.getDate() + 1);
-                    const nextDayStr = nextDayObj.toISOString().split('T')[0];
+                    const nextDayStr = getNextDateStr(date);
                     
-                    if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00']) {
-                        arr[24] = dataMap[nextDayStr]['00:00'][key];
+                    // 兼容 0:00 和 00:00
+                    let nextData = null;
+                    if (dataMap[nextDayStr]) {
+                        nextData = dataMap[nextDayStr]['00:00'] || dataMap[nextDayStr]['0:00'];
+                    }
+                    
+                    if (nextData) {
+                        arr[24] = nextData[key];
                     }
                 }
                 return arr;
@@ -373,7 +388,7 @@
                                 }
                             }
 
-                            let dataObj = dataMap[dateStr] && dataMap[dateStr][lookupTime];
+                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime] || dataMap[dateStr][lookupTime.replace(':00',':00')]);
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
@@ -453,7 +468,6 @@
                 tooltip: { 
                     trigger: 'axis', 
                     confine: true,
-                    // 【修复】图2提示框加入 24点 借位逻辑
                     formatter: function (params) {
                         let timeStr = params[0].axisValue;
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
@@ -473,7 +487,7 @@
                                 }
                             }
 
-                            let dataObj = dataMap[dateStr] && dataMap[dateStr][lookupTime];
+                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime] || dataMap[dateStr][lookupTime.replace(':00',':00')]);
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
