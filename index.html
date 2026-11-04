@@ -268,8 +268,13 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
+            // 【核心修复】：如果是今天0点，数据强制为0；如果是24点借位，拿原始数据
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
+                    if (date === selectedDate && h === '00:00') {
+                        if (key === 'heart') return 0; // 心动强制0
+                        if (key === 'heartDelta' || key === 'powerDelta') return 0; // 增幅强制0
+                    }
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
                         return dataMap[date][h][key];
                     }
@@ -357,7 +362,6 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    // 【终极强制】：只有当前看的是今天，且时间轴是 00:00，才显示 0
                                     if (timeStr === '00:00' && dateStr === selectedDate) {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
@@ -435,7 +439,6 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
-                                    // 【终极强制】：只有当前看的是今天，且时间轴是 00:00，才显示 0
                                     if (timeStr === '00:00' && dateStr === selectedDate) {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
