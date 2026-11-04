@@ -268,7 +268,6 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
-            // 【核心修复】：今天0点强制为0
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
                     if (date === selectedDate && h === '00:00') {
@@ -420,7 +419,6 @@
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
                             if (!isDataValid) return;
 
-                            // 【终极修复】：如果看的是今天0点，数值和增幅全显示0，不用管表格写了什么
                             let valStr = "";
                             let deltaVal = "";
                             
@@ -429,6 +427,7 @@
                             else if (p.seriesName === shortPrevDate + ' 团建增幅') dateStr = prevDateStr;
                             else dateStr = "2026-" + p.seriesName.split(' ')[0];
 
+                            // 如果是今天 0 点，强制显示 0
                             if (timeStr === '00:00' && dateStr === selectedDate) {
                                 valStr = "0";
                                 deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
@@ -439,9 +438,10 @@
                                     lookupTime = '00:00';
                                     if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) dateStr = selectedDate;
                                 }
+                                // 【修改点】这里不再显示红色的+数字
                                 let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
                                 if (dataObj && dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
-                                    deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
+                                    // 什么都不做，不再加 deltaVal
                                 }
                             }
                             
