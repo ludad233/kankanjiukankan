@@ -68,10 +68,24 @@
         .up { color: #e74c3c; font-weight: bold; }
         .down { color: #27ae60; font-weight: bold; }
         
+        /* Tooltip 样式 */
         .custom-tooltip-title { font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #333; }
         .custom-tooltip-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 13px; color: #666; }
         .custom-tooltip-val { font-weight: bold; color: #333; margin-left: 10px; }
         .custom-tooltip-delta { margin-left: 6px; font-size: 11px; }
+        
+        /* 胶囊对比样式 */
+        .tooltip-capsule {
+            margin-top: 8px;
+            padding: 6px 10px;
+            background: #FDF2E9;
+            border: 1px dashed #FFB27A;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #D35400;
+            text-align: center;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -172,7 +186,7 @@
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
-                    if (formattedDate < '2026-11-01') return; // 跳过 11月1日之前
+                    if (formattedDate < '2026-11-01') return; 
 
                     let timeParts = timeStr.split(' ')[1].split(':');
                     let hour = parseInt(timeParts[0], 10);
@@ -370,8 +384,6 @@
                         
                         params.forEach(p => {
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
-                            
-                            // 【核心修复】如果没有数据（NaN），连带着增幅也不要显示
                             if (!isDataValid) return;
 
                             let valStr = Number(p.value).toLocaleString();
@@ -475,10 +487,11 @@
                         let timeStr = params[0].axisValue;
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
                         
+                        let todayCumulative = 0;
+                        let prevCumulative = 0;
+
                         params.forEach(p => {
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
-                            
-                            // 【核心修复】如果没有数据（NaN），直接不渲染
                             if (!isDataValid) return;
 
                             let valStr = Number(p.value).toLocaleString();
@@ -499,6 +512,19 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
+                                    // 累加累计增幅 (遍历0点到当前时刻)
+                                    let currentHour = parseInt(timeStr.split(':')[0]);
+                                    if (timeStr === '24:00') currentHour = 24;
+                                    
+                                    for(let i=0; i<=currentHour; i++){
+                                        let hStr = (i < 10 ? '0'+i : i) + ':00';
+                                        let dayObj = dataMap[dateStr] && dataMap[dateStr][hStr];
+                                        if (dayObj && dayObj.powerDelta) {
+                                            if(dateStr === selectedDate) todayCumulative += dayObj.powerDelta;
+                                            else prevCumulative += dayObj.powerDelta;
+                                        }
+                                    }
+
                                     if (timeStr === '00:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
@@ -520,6 +546,20 @@
                                 </div>
                             `;
                         });
+
+                        // 【新增】胶囊对比差距
+                        if (todayCumulative > 0 || prevCumulative > 0) {
+                            let diff = todayCumulative - prevCumulative;
+                            let diffColor = diff >= 0 ? '#e74c3c' : '#27ae60'; // 红涨绿跌
+                            let diffText = diff >= 0 ? `领先 ${diff.toLocaleString()}` : `落后 ${Math.abs(diff).toLocaleString()}`;
+                            
+                            html += `
+                                <div class="tooltip-capsule">
+                                    累计增幅差距: <span style="color:${diffColor}; font-size:14px; margin-left:4px;">${diffText}</span>
+                                </div>
+                            `;
+                        }
+
                         return html;
                     }
                 },
