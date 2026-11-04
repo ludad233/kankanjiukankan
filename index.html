@@ -159,7 +159,7 @@
         chartHeart.showLoading(); chartPower.showLoading();
 
         let globalDataMap = {}; 
-        let globalAllRows = []; // 【新增】用来存储所有解析后的原始数据行，供全局表格使用
+        let globalAllRows = []; 
 
         fetch('power_data.csv?t=' + new Date().getTime())
             .then(res => {
@@ -198,16 +198,12 @@
                         peopleDelta: cols[8] !== '' ? Number(cols[8]) : null
                     };
 
-                    // 存一份全局数组
                     globalAllRows.push(rowData);
 
-                    // 存一份按日期分类的 Map
                     if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
                     globalDataMap[formattedDate][timeHour] = rowData;
                 });
 
-                // 【核心修改】直接把全局最新的 10 条塞进表格，不再受选中的日期影响
-                // 因为 globalAllRows 是按 CSV 顺序（从早到晚）读取的，倒序取前 10 个就是最新 10 条
                 renderGlobalTable(globalAllRows.slice(-10).reverse());
 
                 const sortedDates = Array.from(datesSet).sort().reverse(); 
@@ -227,7 +223,6 @@
                 document.querySelector('#dataTable tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:red;">读取失败，请确保 power_data.csv 已重新生成。</td></tr>';
             });
 
-        // 渲染全局最新表格
         function renderGlobalTable(latestRows) {
             const tbody = document.querySelector('#dataTable tbody');
             tbody.innerHTML = '';
@@ -316,6 +311,7 @@
             }
             if (dataMap[prevDateStr]) {
                 let prevHeartData = getSeriesData(prevDateStr, 'heart');
+                // 【强制连接 24 点】
                 if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
                     prevHeartData[24] = dataMap[selectedDate]['00:00'].heart;
                 }
@@ -335,10 +331,19 @@
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
+                let histData = getSeriesData(date, 'heart');
+                // 历史日期的 24 点也连上
+                const nextD = new Date(date);
+                nextD.setDate(nextD.getDate() + 1);
+                const nextDateStr = nextD.toISOString().split('T')[0];
+                if (dataMap[nextDateStr] && dataMap[nextDateStr]['00:00']) {
+                    histData[24] = dataMap[nextDateStr]['00:00'].heart;
+                }
+
                 heartSeries.push({ 
                     name: date.substring(5) + ' 心动', 
                     type: 'line', 
-                    data: getSeriesData(date, 'heart'), 
+                    data: histData, 
                     smooth: false, 
                     symbol: 'none', 
                     itemStyle: { color: '#A0A0A0' },
@@ -421,6 +426,7 @@
             }
             if (dataMap[prevDateStr]) {
                 let prevPowerData = getSeriesData(prevDateStr, 'powerDelta');
+                // 【强制连接 24 点】
                 if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
                     prevPowerData[24] = dataMap[selectedDate]['00:00'].powerDelta;
                 }
@@ -439,10 +445,18 @@
 
             allDates.forEach(date => {
                 if (date === selectedDate || date === prevDateStr) return;
+                let histData = getSeriesData(date, 'powerDelta');
+                const nextD = new Date(date);
+                nextD.setDate(nextD.getDate() + 1);
+                const nextDateStr = nextD.toISOString().split('T')[0];
+                if (dataMap[nextDateStr] && dataMap[nextDateStr]['00:00']) {
+                    histData[24] = dataMap[nextDateStr]['00:00'].powerDelta;
+                }
+
                 powerSeries.push({ 
                     name: date.substring(5) + ' 团建增幅', 
                     type: 'line', 
-                    data: getSeriesData(date, 'powerDelta'), 
+                    data: histData, 
                     smooth: false, 
                     symbol: 'none', 
                     itemStyle: { color: '#A0A0A0' },
