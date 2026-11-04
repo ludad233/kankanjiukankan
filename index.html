@@ -281,9 +281,7 @@
             }
 
             function getSeriesData(date, key) {
-                // 将 00:00 - 24:00 的数据映射成数组
                 let arr = xAxisHours.map(h => {
-                    // 如果是今天 0 点，心动强制为0
                     if (date === selectedDate && h === '00:00') {
                         if(key === 'heart') return 0;
                         if(key === 'heartDelta') return 0;
@@ -295,7 +293,7 @@
                     return null;
                 });
 
-                // 【核心绝杀】如果这一天的 24:00 没有数据，去借下一天 00:00 的数据
+                // 强行借下一天 0 点数据填到 24 点
                 if (arr[24] === null || arr[24] === undefined) {
                     const nextDayObj = new Date(date);
                     nextDayObj.setDate(nextDayObj.getDate() + 1);
@@ -452,7 +450,55 @@
 
             chartPower.hideLoading();
             chartPower.setOption({
-                tooltip: { trigger: 'axis', confine: true },
+                tooltip: { 
+                    trigger: 'axis', 
+                    confine: true,
+                    // 【修复】图2提示框加入 24点 借位逻辑
+                    formatter: function (params) {
+                        let timeStr = params[0].axisValue;
+                        let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
+                        
+                        params.forEach(p => {
+                            let valStr = p.value !== null ? Number(p.value).toLocaleString() : '-';
+                            let deltaVal = '';
+                            
+                            let dateStr = selectedDate;
+                            if(p.seriesName.includes(prevDateStr.substring(5))) dateStr = prevDateStr;
+                            
+                            let lookupTime = timeStr;
+                            if (timeStr === '24:00' && dateStr === prevDateStr) {
+                                lookupTime = '00:00';
+                                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
+                                    dateStr = selectedDate;
+                                }
+                            }
+
+                            let dataObj = dataMap[dateStr] && dataMap[dateStr][lookupTime];
+                            
+                            if (dataObj) {
+                                if (p.seriesName.includes('团建增幅')) {
+                                    if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
+                                    }
+                                }
+                            }
+                            
+                            html += `
+                                <div class="custom-tooltip-item">
+                                    <div style="display:flex; align-items:center;">
+                                        ${p.marker}
+                                        <span style="margin-left:4px;">${p.seriesName}</span>
+                                    </div>
+                                    <div>
+                                        <span class="custom-tooltip-val">${valStr}</span>
+                                        ${deltaVal}
+                                    </div>
+                                </div>
+                            `;
+                        });
+                        return html;
+                    }
+                },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 3, fontSize: 10 } },
