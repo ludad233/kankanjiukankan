@@ -1,644 +1,207 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>电力值数据追踪</title>
-    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-    <style>
-        body {
-            margin: 0; padding: 8px; background-color: #f5f5f5;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            display: flex; flex-direction: column; align-items: center; overflow-x: hidden;
-        }
-        .container { width: 100%; max-width: 900px; }
-        .card {
-            background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-            margin-bottom: 12px; padding: 12px 0; overflow: hidden;
-        }
-        
-        .page-header {
-            text-align: center;
-            color: #D35400;
-            font-size: 20px;
-            font-weight: bold;
-            margin-bottom: 15px;
-            margin-top: 10px;
-            letter-spacing: 1px;
-        }
+import asyncio
+import csv
+import os
+import re
+import shutil
+from datetime import datetime, timedelta
+from playwright.async_api import async_playwright
 
-        .header-bar { display: flex; justify-content: center; align-items: center; margin-bottom: 10px; gap: 10px; }
-        .date-select {
-            font-size: 16px; font-weight: bold; color: #D35400; background-color: #FDF2E9;
-            border: 1px solid #FFB27A; border-radius: 8px; padding: 8px 12px; outline: none; appearance: none;
-        }
-        
-        .stats-wrap { text-align: center; margin-bottom: 5px; padding: 0 10px; }
-        .stats {
-            text-align: center; font-size: 13px; font-weight: bold; color: #D35400;
-            background: #FDF2E9; border: 1px solid #FFB27A; border-radius: 20px;
-            padding: 6px 15px; display: inline-block; line-height: 1.4;
-            box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
-        }
-        
-        .diff-stats-wrap { text-align: center; margin-bottom: 10px; }
-        .diff-stats {
-            text-align: center; font-size: 13px; font-weight: bold; color: #333;
-            background: #FFF5F5; border: 1px dashed #e74c3c; border-radius: 20px;
-            padding: 6px 15px; display: inline-block; line-height: 1.4;
-            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.1);
-        }
+import matplotlib
 
-        .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
-        .table-scroll-box::-webkit-scrollbar { display: none; }
-        
-        .chart-wrapper { width: 100%; height: 350px; }
-        
-        .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
-        h3 { text-align: center; color: #333; margin: 0 0 10px 0; font-size: 15px; }
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 
-        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 620px; }
-        th, td { padding: 10px 4px; text-align: right; border-bottom: 1px solid #eee; white-space: nowrap; }
-        th { background-color: #fdf2e9; color: #d35400; font-weight: bold; text-align: center; font-size: 12px; position: sticky; top: 0; }
-        
-        th:first-child, td:first-child { 
-            padding-left: 8px; padding-right: 8px; text-align: left; color: #666; 
-            position: sticky; left: 0; background: white; z-index: 1;
-            box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1);
-        }
-        th:first-child { background: #fdf2e9; z-index: 2; }
-        
-        .val-heart { font-weight: bold; color: #333; }
-        .val-power { font-weight: bold; color: #333; }
-        .val-total { font-weight: bold; color: #333; } 
-        .val-people { font-weight: bold; color: #D81B60; }
-        
-        .up { color: #e74c3c; font-weight: bold; }
-        .down { color: #27ae60; font-weight: bold; }
-        
-        .custom-tooltip-title { font-weight: bold; margin-bottom: 5px; font-size: 14px; color: #333; }
-        .custom-tooltip-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 13px; color: #666; }
-        .custom-tooltip-val { font-weight: bold; color: #333; margin-left: 10px; }
-        .custom-tooltip-delta { margin-left: 6px; font-size: 11px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="page-header">电力值数据追踪</div>
+# ============ 配置 ============
+URL_TEAM1 = "https://y.qq.com/tmead/promotion/h5/team-activity/detail?_hidehd=1&_miniplayer=1&adtag=img_share&singerId=6665073&activityId=17936311664035&searchid=568305526626555693,&p_share=waFlj7ebDqqbQF2OOC4PsiQYhkYZ9aIFBalaGNW5ISE&ADTAG=wxfshare&hosteuin=oiEq7e6k7Knqon**"
+URL_POWER = "https://y.qq.com/tmead/promotion/h5/powering/1793152992875?_hidehd=1&_miniplayer=1&adtag=share_task&singerId=6665073&p_share=w2pZEizuC5V-xTHRIivoTwD_5f_DMRfGNgTtS7isP_4&hosteuin=oiEqow6FoiCA7n**&ADTAG=wxfshare"
 
-        <div class="card" style="padding: 10px 0; text-align: center;">
-            <div class="header-bar">
-                <span>选择查看图表日期：</span>
-                <select id="dateSelector" class="date-select"></select>
-            </div>
-            <div class="stats-wrap">
-                <div class="stats" id="tableSumStats">总计计算中...</div>
-            </div>
-        </div>
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE = os.path.join(BASE_DIR, "power_data.csv")
+CHART_FILE = os.path.join(BASE_DIR, "comparison_chart.png")
+HISTORY_DIR = os.path.join(BASE_DIR, "history")
+os.makedirs(HISTORY_DIR, exist_ok=True)
 
-        <!-- 表格区域 -->
-        <div class="card">
-            <h3 id="tableTitle">全局最新 10 条数据明细</h3>
-            <div class="table-scroll-box">
-                <table id="dataTable">
-                    <thead>
-                        <tr>
-                            <th>时间</th>
-                            <th>心动人数</th>
-                            <th>心动增幅</th>
-                            <th>团建电力</th>
-                            <th>电力增幅</th>
-                            <th>总电力值</th>
-                            <th>总电增幅</th>
-                            <th>发电总人数</th>
-                            <th>人数增幅</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr><td colspan="9" style="text-align:center;">数据加载中...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
 
-        <!-- 图表区域 -->
-        <div class="card">
-            <div class="title">心动人数趋势</div>
-            <div class="diff-stats-wrap">
-                <div class="diff-stats" id="heartDiffStats">计算中...</div>
-            </div>
-            <div style="width: 100%;"><div class="chart-wrapper" id="chartHeart"></div></div>
-        </div>
+# ============ 抓取与存储 ============
+def parse_num(text):
+    if not text: return None
+    m = re.search(r"[\d,]+", str(text))
+    return int(m.group(0).replace(",", "")) if m else None
 
-        <div class="card">
-            <div class="title">团建电力增幅趋势</div>
-            <div class="diff-stats-wrap">
-                <div class="diff-stats" id="powerDiffStats">计算中...</div>
-            </div>
-            <div style="width: 100%;"><div class="chart-wrapper" id="chartPower" style="height: 300px;"></div></div>
-        </div>
-    </div>
 
-    <script>
-        function formatNum(num) { 
-            if (num === 0) return '0';
-            return num ? Number(num).toLocaleString() : '-'; 
-        }
-        
-        function formatDelta(num) {
-            if (num === 0) return '0';
-            if (num === null || num === undefined || num === '' || isNaN(num)) return '-';
-            const val = Number(num);
-            if (val > 0) return `<span class="up">+${val.toLocaleString()}</span>`;
-            if (val < 0) return `<span class="down">${val.toLocaleString()}</span>`;
-            return '0';
-        }
+async def scrape_team(page, url):
+    result = {"今日心动人数": None, "团建电力值": None}
+    max_retries = 3
 
-        function fmtW(v) {
-            if (v === null || v === undefined || isNaN(v)) return "0w";
-            return (v / 10000).toFixed(1) + 'w';
-        }
+    for attempt in range(max_retries):
+        try:
+            print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取团建数据...")
+            await page.goto(url, wait_until="domcontentloaded", timeout=90000)
 
-        const chartHeart = echarts.init(document.getElementById('chartHeart'));
-        const chartPower = echarts.init(document.getElementById('chartPower'));
-        chartHeart.showLoading(); chartPower.showLoading();
+            try:
+                await page.wait_for_selector("text=本团今日心动", timeout=20000)
+            except:
+                pass
 
-        let globalDataMap = {}; 
-        let globalAllRows = []; 
+            await page.wait_for_timeout(3000)
 
-        fetch('power_data.csv?t=' + new Date().getTime())
-            .then(res => {
-                if(!res.ok) throw new Error('网络请求失败');
-                return res.text();
-            })
-            .then(csv => {
-                const lines = csv.trim().split('\n').slice(1);
-                const datesSet = new Set();
+            try:
+                heart_ele = page.locator("text=本团今日心动").first
+                parent_text = await heart_ele.evaluate("el => el.parentElement.innerText")
+                result["今日心动人数"] = parse_num(parent_text)
+            except:
+                pass
 
-                // 【彻底防串线】记录每一个日期自己的“上一个数据”
-                let dailyLastValidData = {}; 
+            try:
+                body_text = await page.locator("body").inner_text()
+                matches = re.findall(r"(\d{1,3}(?:,\d{3})+)\s*/\s*(\d{1,3}(?:,\d{3})+)", body_text)
+                if matches:
+                    best = max(matches, key=lambda x: int(x[0].replace(",", "")))
+                    result["团建电力值"] = int(best[0].replace(",", ""))
+            except:
+                pass
 
-                lines.forEach(line => {
-                    const cols = line.split(',');
-                    if (cols.length < 9) return; 
-                    
-                    const timeStr = cols[0].trim();
-                    if(!timeStr) return;
+            if result["今日心动人数"] is not None and result["团建电力值"] is not None:
+                print(f"✅ 团建数据抓取成功！心动: {result['今日心动人数']}, 电力: {result['团建电力值']}")
+                return result
+            else:
+                print(f"⚠️ 第 {attempt + 1} 次抓取数据异常，准备重试...")
+                await page.reload()
+                await page.wait_for_timeout(5000)
 
-                    const datePart = timeStr.split(' ')[0].replace(/\//g, '-');
-                    const dArr = datePart.split('-');
-                    const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
-                    
-                    // 取消 11 月 1 日的限制，防止吞数据
-                    // if (formattedDate < '2026-11-01') return; 
+        except Exception as e:
+            print(f"⚠️ 第 {attempt + 1} 次抓取抛出异常: {e}")
+            await page.wait_for_timeout(5000)
 
-                    let timeParts = timeStr.split(' ')[1].split(':');
-                    let hour = parseInt(timeParts[0], 10);
-                    let timeHour = (hour < 10 ? '0' + hour : hour) + ':00';
-                    
-                    datesSet.add(formattedDate);
+    return result
 
-                    const heart = Number(cols[1]) || null;
-                    const power = Number(cols[3]) || null;
-                    const totalPower = Number(cols[5]) || null;
-                    const people = Number(cols[7]) || null;
 
-                    // 提取当天该小时的前一个有效数据
-                    let lastValid = dailyLastValidData[formattedDate];
+async def scrape_power(page):
+    result = {"总电力值": None, "发电总人数": None}
+    max_retries = 3
 
-                    let heartDelta = null;
-                    let powerDelta = null;
-                    let totalDelta = null;
-                    let peopleDelta = null;
+    for attempt in range(max_retries):
+        try:
+            print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取电力及人数...")
+            await page.goto(URL_POWER, wait_until="domcontentloaded", timeout=90000)
 
-                    if (lastValid) {
-                        if (heart !== null && lastValid.heart !== null) heartDelta = heart - lastValid.heart;
-                        if (power !== null && lastValid.power !== null) powerDelta = power - lastValid.power;
-                        if (totalPower !== null && lastValid.totalPower !== null) totalDelta = totalPower - lastValid.totalPower;
-                        if (people !== null && lastValid.people !== null) peopleDelta = people - lastValid.people;
-                    } else if (timeHour === '00:00') {
-                        // 0 点强制增幅为 0
-                        heartDelta = 0;
-                        powerDelta = 0;
-                        totalDelta = 0;
-                        peopleDelta = 0;
-                    }
+            try:
+                await page.wait_for_selector("body", timeout=15000)
+            except:
+                pass
 
-                    // 为了图表在 0 点能成功触底，强制当前心动为 0
-                    let finalHeart = (timeHour === '00:00') ? 0 : heart;
+            await page.wait_for_timeout(4000)
 
-                    const rowData = {
-                        rawTime: timeStr,
-                        heart: finalHeart,
-                        heartDelta: heartDelta,
-                        power: power,
-                        powerDelta: powerDelta,
-                        totalPower: totalPower,
-                        totalDelta: totalDelta,
-                        people: people,
-                        peopleDelta: peopleDelta
-                    };
+            try:
+                body_text = await page.locator("body").inner_text()
 
-                    globalAllRows.push(rowData);
+                nums = re.findall(r"\d{1,3}(?:,\d{3})+", body_text)
+                if nums:
+                    result["总电力值"] = max(int(n.replace(",", "")) for n in nums)
 
-                    if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
-                    globalDataMap[formattedDate][timeHour] = rowData;
+                people_matches = re.search(r"发电总人数\s*([\d,]+)", body_text)
+                if people_matches:
+                    result["发电总人数"] = int(people_matches.group(1).replace(",", ""))
+                else:
+                    participate_matches = re.search(r"参与.*?([\d,]+)", body_text)
+                    if participate_matches:
+                        result["发电总人数"] = int(participate_matches.group(1).replace(",", ""))
+            except Exception as parse_e:
+                pass
 
-                    // 只要这行抓到了数据，就记录下来给当天的下个小时用
-                    if (heart !== null || power !== null) {
-                        dailyLastValidData[formattedDate] = {
-                            heart: finalHeart, 
-                            power: power,
-                            totalPower: totalPower,
-                            people: people
-                        };
-                    }
-                });
+            if result["总电力值"] is not None:
+                print(f"✅ 成功！总电力: {result['总电力值']}, 发电总人数: {result['发电总人数']}")
+                return result
+            else:
+                print(f"⚠️ 第 {attempt + 1} 次抓取异常，准备重试...")
+                await page.reload()
+                await page.wait_for_timeout(5000)
 
-                // 渲染全局最新的 10 条数据
-                renderGlobalTable(globalAllRows.slice(-10).reverse());
+        except Exception as e:
+            print(f"⚠️ 第 {attempt + 1} 次抓取总电力异常: {e}")
+            await page.wait_for_timeout(5000)
 
-                const sortedDates = Array.from(datesSet).sort().reverse(); 
-                const selector = document.getElementById('dateSelector');
-                
-                sortedDates.forEach(date => {
-                    const opt = document.createElement('option');
-                    opt.value = date; opt.innerText = date; selector.appendChild(opt);
-                });
+    return result
 
-                if (sortedDates.length > 0) { selector.value = sortedDates[0]; }
-                selector.addEventListener('change', (e) => { renderPage(e.target.value); });
-                renderPage(selector.value);
-            })
-            .catch(err => { 
-                console.error('数据加载失败:', err); 
-                document.querySelector('#dataTable tbody').innerHTML = '<tr><td colspan="9" style="text-align:center; color:red;">读取失败，请确保 power_data.csv 已重新生成。</td></tr>';
-            });
 
-        function renderGlobalTable(latestRows) {
-            const tbody = document.querySelector('#dataTable tbody');
-            tbody.innerHTML = '';
-            if (latestRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;">暂无数据</td></tr>';
-                return;
-            }
-            latestRows.forEach(row => {
-                const tr = document.createElement('tr');
-                let showHeart = row.heart;
-                let showHeartDelta = row.heartDelta;
-                let timeDisplay = row.rawTime.split(' ')[1];
-                
-                if(timeDisplay === '0:00' || timeDisplay === '00:00') {
-                    showHeart = 0;
-                    showHeartDelta = 0;
-                }
-                tr.innerHTML = `
-                    <td>${row.rawTime}</td>
-                    <td class="val-heart">${formatNum(showHeart)}</td>
-                    <td>${formatDelta(showHeartDelta)}</td>
-                    <td class="val-power">${formatNum(row.power)}</td>
-                    <td>${formatDelta(row.powerDelta)}</td>
-                    <td class="val-total">${formatNum(row.totalPower)}</td>
-                    <td>${formatDelta(row.totalDelta)}</td>
-                    <td class="val-people">${formatNum(row.people)}</td>
-                    <td>${formatDelta(row.peopleDelta)}</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
+def load_all_rows():
+    if not os.path.exists(CSV_FILE): return [], []
+    for enc in ("utf-8-sig", "utf-8", "gbk", "gb18030"):
+        try:
+            with open(CSV_FILE, "r", encoding=enc, newline="") as f:
+                content = list(csv.reader(f))
+            return content[0], content[1:]
+        except:
+            continue
+    return [], []
 
-        function renderPage(selectedDate) {
-            const dataMap = globalDataMap;
-            const selDateObj = new Date(selectedDate);
-            const prevDateObj = new Date(selDateObj);
-            prevDateObj.setDate(prevDateObj.getDate() - 1);
-            const prevDateStr = prevDateObj.toISOString().split('T')[0];
 
-            const shortSelectedDate = selectedDate.substring(5);
-            const shortPrevDate = prevDateStr.substring(5);
+def parse_dt_loose(s):
+    if not s: return None
+    s = re.sub(r'(\d+[/-]\d+[/-]\d+)\s+(\d{1}):', r'\1 0\2:', s)
+    s = s.strip().replace("/", "-")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(s, fmt)
+        except:
+            pass
+    return None
 
-            let todayTotalDelta = 0;
-            let lastHourToday = 0;
-            
-            if (dataMap[selectedDate]) {
-                Object.entries(dataMap[selectedDate]).forEach(([h, d]) => {
-                    if (d.powerDelta) todayTotalDelta += d.powerDelta;
-                    let hr = parseInt(h.split(':')[0]);
-                    if (hr > lastHourToday && hr < 24) lastHourToday = hr;
-                });
-            }
-            
-            document.getElementById('tableSumStats').innerText = 
-                `${shortSelectedDate} 团建总增幅: ${fmtW(todayTotalDelta)}`;
 
-            const xAxisHours = [];
-            for (let i = 0; i <= 24; i++) {
-                xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
-            }
+def get_prev_hour_record(curr_dt, all_rows):
+    def fmt_no_pad(dt_obj):
+        return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
-            function getNextDateStr(dateStr) {
-                let parts = dateStr.split('-');
-                let y = parseInt(parts[0]);
-                let m = parseInt(parts[1]);
-                let d = parseInt(parts[2]);
-                let dt = new Date(y, m - 1, d);
-                dt.setDate(dt.getDate() + 1);
-                let ny = dt.getFullYear();
-                let nm = ('0' + (dt.getMonth() + 1)).slice(-2);
-                let nd = ('0' + dt.getDate()).slice(-2);
-                return `${ny}-${nm}-${nd}`;
-            }
+    # 【核心修复】往前找最多 12 个小时，只匹配年月日和小时，避开分钟数的干扰
+    for i in range(1, 13):
+        prev_hour_dt = curr_dt - timedelta(hours=i)
+        prev_hour_str = fmt_no_pad(prev_hour_dt)
 
-            function getSeriesData(date, key) {
-                let arr = xAxisHours.map(h => {
-                    if (date === selectedDate && h === '00:00') {
-                        if(key === 'heart' || key === 'heartDelta' || key === 'powerDelta') {
-                            return 0;
-                        }
-                    }
-                    
-                    if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
-                        return dataMap[date][h][key];
-                    }
-                    return null;
-                });
+        if prev_hour_dt.day != curr_dt.day:
+            break
 
-                if (arr[24] === null || arr[24] === undefined) {
-                    const nextDayStr = getNextDateStr(date);
-                    let nextData = null;
-                    if (dataMap[nextDayStr]) {
-                        nextData = dataMap[nextDayStr]['00:00'];
-                    }
-                    
-                    if (nextData) {
-                        arr[24] = nextData[key];
-                    }
-                }
-                return arr;
-            }
+        for row in reversed(all_rows):
+            if not row or len(row) < 9: continue
+            if row[0].startswith(prev_hour_str):
+                return row
+    return None
 
-            // ============ 图1：心动人数趋势 ============
-            
-            let todayHeart = null;
-            let prevHeart = null;
-            
-            if (dataMap[selectedDate]) {
-                for (let i = lastHourToday; i >= 0; i--) {
-                    let hStr = (i < 10 ? '0'+i : i) + ':00';
-                    if (dataMap[selectedDate][hStr] && dataMap[selectedDate][hStr].heart) {
-                        todayHeart = dataMap[selectedDate][hStr].heart;
-                        break;
-                    }
-                }
-            }
-            if (dataMap[prevDateStr]) {
-                for (let i = lastHourToday; i >= 0; i--) {
-                    let hStr = (i < 10 ? '0'+i : i) + ':00';
-                    if (dataMap[prevDateStr][hStr] && dataMap[prevDateStr][hStr].heart) {
-                        prevHeart = dataMap[prevDateStr][hStr].heart;
-                        break;
-                    }
-                }
-            }
 
-            const heartDiffContainer = document.getElementById('heartDiffStats');
-            if (todayHeart !== null && prevHeart !== null) {
-                let diff = todayHeart - prevHeart;
-                let diffColor = diff >= 0 ? '#e74c3c' : '#27ae60';
-                let diffText = diff >= 0 ? `领先 ${diff.toLocaleString()} 人` : `落后 ${Math.abs(diff).toLocaleString()} 人`;
-                heartDiffContainer.innerHTML = `截至当前，今天比昨天同时段<br><span style="color:${diffColor}; font-size:16px; margin-top:4px; display:inline-block;">${diffText}</span>`;
-            } else {
-                heartDiffContainer.innerHTML = `数据不足，无法对比`;
-            }
+def append_csv(row_dict):
+    file_exists = os.path.exists(CSV_FILE)
+    header, all_rows = load_all_rows()
+    curr_dt = datetime.strptime(row_dict["时间"], "%Y-%m-%d %H:%M:%S")
 
-            const heartSeries = [];
-            
-            if (dataMap[selectedDate]) {
-                heartSeries.push({ 
-                    name: shortSelectedDate + ' 心动', 
-                    type: 'line', 
-                    data: getSeriesData(selectedDate, 'heart'), 
-                    smooth: false, 
-                    symbol: 'circle', 
-                    symbolSize: 4, 
-                    itemStyle: { color: '#FF8C42' }, 
-                    lineStyle: { color: '#FF8C42', width: 2.5 } 
-                });
-            }
-            if (dataMap[prevDateStr]) {
-                heartSeries.push({ 
-                    name: shortPrevDate + ' 心动', 
-                    type: 'line', 
-                    data: getSeriesData(prevDateStr, 'heart'), 
-                    smooth: false, 
-                    symbol: 'circle', 
-                    symbolSize: 4, 
-                    itemStyle: { color: '#FFB3C6' }, 
-                    lineStyle: { color: '#FFB3C6', width: 2 } 
-                });
-            }
+    if curr_dt.minute >= 50:
+        curr_dt = curr_dt + timedelta(minutes=(60 - curr_dt.minute))
 
-            // 这里取消硬编码限制，把历史灰线加回来
-            const allDates = Object.keys(dataMap).sort();
-            allDates.forEach(date => {
-                if (date === selectedDate || date === prevDateStr) return;
-                heartSeries.push({ 
-                    name: date.substring(5) + ' 心动', 
-                    type: 'line', 
-                    data: getSeriesData(date, 'heart'), 
-                    smooth: false, 
-                    symbol: 'none', 
-                    itemStyle: { color: '#A0A0A0' },
-                    lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, 
-                    emphasis: { disabled: true } 
-                });
-            });
+    formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} {curr_dt.hour:02d}:{curr_dt.minute:02d}"
+    prev_row = get_prev_hour_record(curr_dt, all_rows)
 
-            chartHeart.hideLoading();
-            chartHeart.setOption({
-                tooltip: { 
-                    trigger: 'axis', 
-                    confine: true,
-                    formatter: function (params) {
-                        let timeStr = params[0].axisValue;
-                        let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
-                        
-                        params.forEach(p => {
-                            let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
-                            if (!isDataValid) return;
+    def calc_delta(curr_val, col_idx):
+        if curr_val is None or prev_row is None: return ""
+        try:
+            prev_val_str = prev_row[col_idx]
+            if prev_val_str == "" or prev_val_str is None: return ""
+            return int(curr_val) - int(prev_val_str)
+        except:
+            return ""
 
-                            let valStr = Number(p.value).toLocaleString();
-                            let deltaVal = '';
-                            
-                            let dateStr = selectedDate;
-                            if(p.seriesName.includes(prevDateStr.substring(5))) dateStr = prevDateStr;
-                            
-                            let lookupTime = timeStr;
-                            if (timeStr === '24:00' && dateStr === prevDateStr) {
-                                lookupTime = '00:00';
-                                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
-                                    dateStr = selectedDate;
-                                }
-                            }
+    row = [
+        formatted_time,
+        row_dict["今日心动人数1"] or "", calc_delta(row_dict["今日心动人数1"], 1),
+        row_dict["团建电力值1"] or "", calc_delta(row_dict["团建电力值1"], 3),
+        row_dict["总电力值"] or "", calc_delta(row_dict["总电力值"], 5),
+        row_dict["发电总人数"] or "", calc_delta(row_dict["发电总人数"], 7),
+    ]
 
-                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
-                            
-                            if (dataObj) {
-                                if (p.seriesName.includes('心动')) {
-                                    if (timeStr === '00:00' || timeStr === '24:00') {
-                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
-                                    }
-                                }
-                            }
-                            
-                            html += `
-                                <div class="custom-tooltip-item">
-                                    <div style="display:flex; align-items:center;">
-                                        ${p.marker}
-                                        <span style="margin-left:4px;">${p.seriesName}</span>
-                                    </div>
-                                    <div>
-                                        <span class="custom-tooltip-val">${valStr}</span>
-                                        ${deltaVal}
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        return html;
-                    }
-                },
-                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
-                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 3, fontSize: 10 } },
-                yAxis: [{ type: 'value', name: '心动', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } }],
-                series: heartSeries
-            }, true);
-
-            // ============ 图2：团建电力增幅趋势 ============
-            
-            let prevCumulativeAtCur = 0;
-            if (dataMap[prevDateStr]) {
-                for(let i=0; i <= lastHourToday; i++) {
-                    let hStr = (i < 10 ? '0'+i : i) + ':00';
-                    if (dataMap[prevDateStr][hStr] && dataMap[prevDateStr][hStr].powerDelta) {
-                        prevCumulativeAtCur += dataMap[prevDateStr][hStr].powerDelta;
-                    }
-                }
-            }
-            
-            let diff = todayTotalDelta - prevCumulativeAtCur;
-            let diffColor = diff >= 0 ? '#e74c3c' : '#27ae60';
-            let diffText = diff >= 0 ? `领先 ${diff.toLocaleString()}` : `落后 ${Math.abs(diff).toLocaleString()}`;
-            
-            document.getElementById('powerDiffStats').innerHTML = `截至当前，今天比昨天同时段<br><span style="color:${diffColor}; font-size:16px; margin-top:4px; display:inline-block;">${diffText}</span>`;
-
-            const powerSeries = [];
-            
-            if (dataMap[selectedDate]) {
-                powerSeries.push({ 
-                    name: shortSelectedDate + ' 团建增幅', 
-                    type: 'line', 
-                    data: getSeriesData(selectedDate, 'powerDelta'), 
-                    smooth: false, 
-                    symbol: 'circle', 
-                    symbolSize: 4, 
-                    itemStyle: { color: '#FF8C42' }, 
-                    lineStyle: { color: '#FF8C42', width: 2.5 } 
-                });
-            }
-            if (dataMap[prevDateStr]) {
-                powerSeries.push({ 
-                    name: shortPrevDate + ' 团建增幅', 
-                    type: 'line', 
-                    data: getSeriesData(prevDateStr, 'powerDelta'), 
-                    smooth: false, 
-                    symbol: 'circle', 
-                    symbolSize: 4, 
-                    itemStyle: { color: '#FFB3C6' }, 
-                    lineStyle: { color: '#FFB3C6', width: 2 } 
-                });
-            }
-
-            allDates.forEach(date => {
-                if (date === selectedDate || date === prevDateStr) return;
-                powerSeries.push({ 
-                    name: date.substring(5) + ' 团建增幅', 
-                    type: 'line', 
-                    data: getSeriesData(date, 'powerDelta'), 
-                    smooth: false, 
-                    symbol: 'none', 
-                    itemStyle: { color: '#A0A0A0' },
-                    lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, 
-                    emphasis: { disabled: true } 
-                });
-            });
-
-            chartPower.hideLoading();
-            chartPower.setOption({
-                tooltip: { 
-                    trigger: 'axis', 
-                    confine: true,
-                    formatter: function (params) {
-                        let timeStr = params[0].axisValue;
-                        let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
-                        
-                        params.forEach(p => {
-                            let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
-                            if (!isDataValid) return;
-
-                            let valStr = Number(p.value).toLocaleString();
-                            let deltaVal = '';
-                            
-                            let dateStr = selectedDate;
-                            if(p.seriesName.includes(prevDateStr.substring(5))) dateStr = prevDateStr;
-                            
-                            let lookupTime = timeStr;
-                            if (timeStr === '24:00' && dateStr === prevDateStr) {
-                                lookupTime = '00:00';
-                                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
-                                    dateStr = selectedDate;
-                                }
-                            }
-
-                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
-                            
-                            if (dataObj) {
-                                if (p.seriesName.includes('团建增幅')) {
-                                    if (timeStr === '00:00') {
-                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
-                                    }
-                                }
-                            }
-                            
-                            html += `
-                                <div class="custom-tooltip-item">
-                                    <div style="display:flex; align-items:center;">
-                                        ${p.marker}
-                                        <span style="margin-left:4px;">${p.seriesName}</span>
-                                    </div>
-                                    <div>
-                                        <span class="custom-tooltip-val">${valStr}</span>
-                                        ${deltaVal}
-                                    </div>
-                                </div>
-                            `;
-                        });
-                        return html;
-                    }
-                },
-                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
-                xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 3, fontSize: 10 } },
-                yAxis: { type: 'value', name: '增幅', scale: true, axisLabel: { fontSize: 11, formatter: function(v) { return v >= 10000 ? (v / 10000) + 'w' : v; } } },
-                series: powerSeries
-            }, true);
-        }
-
-        window.addEventListener('resize', function() { chartHeart.resize(); chartPower.resize(); });
-    </script>
-</body>
-</html>
+    with open(CSV_FILE, "a", encoding="utf-8-sig", newline="") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(
+                ["时间", "心动人数1", "增幅", "团建电力值1", "增幅", "总电力值", "增幅", "发电总人数", "增幅"])
+        writer.writerow(row)
+    print(f"✅ [{formatted_time}] 写入完成。\n")
