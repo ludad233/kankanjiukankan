@@ -110,8 +110,8 @@
     </div>
 
     <script>
-        // 加上版本号，防止浏览器强制缓存老代码
-        const CACHE_BUSTER = 'v=6.0_final';
+        // 提取精准到毫秒的防缓存
+        const CACHE_BUSTER = 'v=' + new Date().getTime();
         
         function formatNum(num) { 
             if (num === 0) return '0';
@@ -172,7 +172,6 @@
                     const totalPower = Number(cols[5]) || null;
                     const people = Number(cols[7]) || null;
 
-                    // 【死命令】：绝对只使用表里的增幅！
                     let heartDelta = cols[2] !== '' ? Number(cols[2]) : null;
                     let powerDelta = cols[4] !== '' ? Number(cols[4]) : null;
                     let totalDelta = cols[6] !== '' ? Number(cols[6]) : null;
@@ -341,7 +340,6 @@
                 heartSeries.push({ name: shortPrevDate + ' 心动', type: 'line', data: getSeriesData(prevDateStr, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
             }
 
-            // 历史灰线排序修复：日期越早，越靠下
             const historicalDates = Object.keys(dataMap).filter(d => d < selectedDate && d !== prevDateStr && d >= '2026-11-01').sort();
             historicalDates.forEach(date => {
                 heartSeries.push({ name: date.substring(5) + ' 心动', type: 'line', data: getSeriesData(date, 'heart'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
@@ -362,7 +360,6 @@
                             let valStr = Number(p.value).toLocaleString();
                             let deltaVal = '';
                             
-                            // 严格锁定数据日期，不再瞎借
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate + ' 心动') dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate + ' 心动') dateStr = prevDateStr;
@@ -378,8 +375,11 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    if (timeStr === '00:00' || timeStr === '24:00') deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
+                                    if (timeStr === '00:00' || (timeStr === '24:00' && dateStr === selectedDate)) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                    } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
+                                    }
                                 }
                             }
                             
@@ -437,7 +437,6 @@
                             let valStr = Number(p.value).toLocaleString();
                             let deltaVal = '';
                             
-                            // 严格锁定数据日期，不再瞎借
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate + ' 团建增幅') dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate + ' 团建增幅') dateStr = prevDateStr;
@@ -453,8 +452,11 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
-                                    if (timeStr === '00:00') deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
+                                    if (timeStr === '00:00') {
+                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                    } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
+                                    }
                                 }
                             }
                             
