@@ -63,7 +63,6 @@
         .val-heart { font-weight: bold; color: #333; }
         .val-power { font-weight: bold; color: #333; }
         .val-total { font-weight: bold; color: #333; } 
-        /* 发电总人数表格颜色：深粉色 */
         .val-people { font-weight: bold; color: #D81B60; }
         
         .up { color: #e74c3c; font-weight: bold; }
@@ -224,6 +223,11 @@
             prevDateObj.setDate(prevDateObj.getDate() - 1);
             const prevDateStr = prevDateObj.toISOString().split('T')[0];
 
+            // 未来一天（为了取今天0点给昨天当24点）
+            const nextDateObj = new Date(selDateObj);
+            nextDateObj.setDate(nextDateObj.getDate() + 1);
+            const nextDateStr = nextDateObj.toISOString().split('T')[0];
+
             const shortSelectedDate = selectedDate.substring(5);
             const shortPrevDate = prevDateStr.substring(5);
 
@@ -256,10 +260,17 @@
             } else {
                 latestRows.forEach(row => {
                     const tr = document.createElement('tr');
+                    // 如果是今天 0 点，强行展示 0
+                    let showHeart = row.heart;
+                    let showHeartDelta = row.heartDelta;
+                    if(row.time === '00:00') {
+                        showHeart = 0;
+                        showHeartDelta = 0;
+                    }
                     tr.innerHTML = `
                         <td>${row.time}</td>
-                        <td class="val-heart">${formatNum(row.heart)}</td>
-                        <td>${formatDelta(row.heartDelta)}</td>
+                        <td class="val-heart">${formatNum(showHeart)}</td>
+                        <td>${formatDelta(showHeartDelta)}</td>
                         <td class="val-power">${formatNum(row.power)}</td>
                         <td>${formatDelta(row.powerDelta)}</td>
                         <td class="val-total">${formatNum(row.totalPower)}</td>
@@ -276,12 +287,17 @@
                 xAxisHours.push((i < 10 ? '0'+i : i) + ':00');
             }
 
+            // 核心修改：取值时，如果是今天 0 点，强制返回 0
             function getSeriesData(date, key) {
                 return xAxisHours.map(h => {
+                    if (date === selectedDate && h === '00:00') {
+                        if(key === 'heart') return 0;
+                        if(key === 'heartDelta') return 0;
+                    }
+                    
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
                         return dataMap[date][h][key];
                     }
-                    if (h === '00:00' && dataMap[date]) return 0;
                     return null;
                 });
             }
@@ -302,10 +318,18 @@
                 });
             }
             if (dataMap[prevDateStr]) {
+                // 昨天的心动数据
+                let prevHeartData = getSeriesData(prevDateStr, 'heart');
+                
+                // 【核心修改】如果今天存在 00:00 的数据，把它借给昨天的 24:00 作为最终结算
+                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
+                    prevHeartData[24] = dataMap[selectedDate]['00:00'].heart;
+                }
+
                 heartSeries.push({ 
                     name: shortPrevDate + ' 心动', 
                     type: 'line', 
-                    data: getSeriesData(prevDateStr, 'heart'), 
+                    data: prevHeartData, 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
@@ -329,8 +353,6 @@
                 });
             });
 
-            // 【删除点】去掉了总人数的紫线
-
             chartHeart.hideLoading();
             chartHeart.setOption({
                 tooltip: { 
@@ -347,7 +369,16 @@
                             let dateStr = selectedDate;
                             if(p.seriesName.includes(prevDateStr.substring(5))) dateStr = prevDateStr;
                             
-                            let dataObj = dataMap[dateStr] && dataMap[dateStr][timeStr];
+                            // 处理 24:00 的特殊取值
+                            let lookupTime = timeStr;
+                            if (timeStr === '24:00' && dateStr === prevDateStr) {
+                                lookupTime = '00:00'; // 如果是昨天的24点，去查今天0点的数据
+                                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
+                                    dateStr = selectedDate; // 借用今天的
+                                }
+                            }
+
+                            let dataObj = dataMap[dateStr] && dataMap[dateStr][lookupTime];
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
@@ -403,10 +434,17 @@
                 });
             }
             if (dataMap[prevDateStr]) {
+                // 昨天的增幅数据
+                let prevPowerData = getSeriesData(prevDateStr, 'powerDelta');
+                // 如果今天存在 00:00 的数据，借给昨天 24:00
+                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) {
+                    prevPowerData[24] = dataMap[selectedDate]['00:00'].powerDelta;
+                }
+
                 powerSeries.push({ 
                     name: shortPrevDate + ' 团建增幅', 
                     type: 'line', 
-                    data: getSeriesData(prevDateStr, 'powerDelta'), 
+                    data: prevPowerData, 
                     smooth: false, 
                     symbol: 'circle', 
                     symbolSize: 4, 
