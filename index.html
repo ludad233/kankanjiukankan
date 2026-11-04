@@ -268,12 +268,11 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
-            // 【核心修复】：如果是今天0点，数据强制为0；如果是24点借位，拿原始数据
+            // 【核心修复】：今天0点强制为0
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
                     if (date === selectedDate && h === '00:00') {
-                        if (key === 'heart') return 0; // 心动强制0
-                        if (key === 'heartDelta' || key === 'powerDelta') return 0; // 增幅强制0
+                        if (key === 'heart' || key === 'heartDelta' || key === 'power' || key === 'powerDelta') return 0; 
                     }
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
                         return dataMap[date][h][key];
@@ -421,29 +420,28 @@
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
                             if (!isDataValid) return;
 
-                            let valStr = Number(p.value).toLocaleString();
-                            let deltaVal = '';
+                            // 【终极修复】：如果看的是今天0点，数值和增幅全显示0，不用管表格写了什么
+                            let valStr = "";
+                            let deltaVal = "";
                             
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate + ' 团建增幅') dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate + ' 团建增幅') dateStr = prevDateStr;
                             else dateStr = "2026-" + p.seriesName.split(' ')[0];
 
-                            let lookupTime = timeStr;
-                            if (timeStr === '24:00' && dateStr === prevDateStr) {
-                                lookupTime = '00:00';
-                                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) dateStr = selectedDate;
-                            }
-
-                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
-                            
-                            if (dataObj) {
-                                if (p.seriesName.includes('团建增幅')) {
-                                    if (timeStr === '00:00' && dateStr === selectedDate) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
-                                    }
+                            if (timeStr === '00:00' && dateStr === selectedDate) {
+                                valStr = "0";
+                                deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                            } else {
+                                valStr = Number(p.value).toLocaleString();
+                                let lookupTime = timeStr;
+                                if (timeStr === '24:00' && dateStr === prevDateStr) {
+                                    lookupTime = '00:00';
+                                    if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) dateStr = selectedDate;
+                                }
+                                let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
+                                if (dataObj && dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                    deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.powerDelta.toLocaleString()}</span>`;
                                 }
                             }
                             
