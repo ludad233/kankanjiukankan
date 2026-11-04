@@ -39,14 +39,15 @@ async def scrape_team(page, url):
     for attempt in range(max_retries):
         try:
             print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取团建数据...")
-            await page.goto(url, wait_until="domcontentloaded", timeout=60000)
+            # 延长超时时间到 90 秒
+            await page.goto(url, wait_until="domcontentloaded", timeout=90000)
 
             try:
-                await page.wait_for_selector("text=本团今日心动", timeout=15000)
+                await page.wait_for_selector("text=本团今日心动", timeout=20000)
             except:
                 pass
 
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(3000)
 
             try:
                 heart_ele = page.locator("text=本团今日心动").first
@@ -70,11 +71,11 @@ async def scrape_team(page, url):
             else:
                 print(f"⚠️ 第 {attempt + 1} 次抓取数据异常，准备重试...")
                 await page.reload()
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(5000)
 
         except Exception as e:
             print(f"⚠️ 第 {attempt + 1} 次抓取抛出异常: {e}")
-            await page.wait_for_timeout(3000)
+            await page.wait_for_timeout(5000)
 
     return result
 
@@ -86,14 +87,15 @@ async def scrape_power(page):
     for attempt in range(max_retries):
         try:
             print(f"🎯 第 {attempt + 1}/{max_retries} 次尝试抓取电力及人数...")
-            await page.goto(URL_POWER, wait_until="domcontentloaded", timeout=60000)
+            # 延长超时时间到 90 秒
+            await page.goto(URL_POWER, wait_until="domcontentloaded", timeout=90000)
 
             try:
-                await page.wait_for_selector("body", timeout=10000)
+                await page.wait_for_selector("body", timeout=15000)
             except:
                 pass
 
-            await page.wait_for_timeout(3000)
+            await page.wait_for_timeout(4000)
 
             try:
                 body_text = await page.locator("body").inner_text()
@@ -103,12 +105,11 @@ async def scrape_power(page):
                 if nums:
                     result["总电力值"] = max(int(n.replace(",", "")) for n in nums)
 
-                # 【核心修复】精准提取“发电总人数”后面的数字
+                # 提取发电总人数
                 people_matches = re.search(r"发电总人数\s*([\d,]+)", body_text)
                 if people_matches:
                     result["发电总人数"] = int(people_matches.group(1).replace(",", ""))
                 else:
-                    # 备用方案：如果没匹配到“发电总人数”，就找“参与”后面的数字
                     participate_matches = re.search(r"参与.*?([\d,]+)", body_text)
                     if participate_matches:
                         result["发电总人数"] = int(participate_matches.group(1).replace(",", ""))
@@ -121,10 +122,11 @@ async def scrape_power(page):
             else:
                 print(f"⚠️ 第 {attempt + 1} 次抓取异常，准备重试...")
                 await page.reload()
-                await page.wait_for_timeout(3000)
+                await page.wait_for_timeout(5000)
 
         except Exception as e:
-            await page.wait_for_timeout(3000)
+            print(f"⚠️ 第 {attempt + 1} 次抓取总电力异常: {e}")
+            await page.wait_for_timeout(5000)
 
     return result
 
@@ -165,7 +167,7 @@ def get_prev_hour_record(curr_dt, all_rows):
             break
 
         for row in reversed(all_rows):
-            if not row or len(row) < 9: continue
+            if not row or len(row) < 10: continue
             if row[0].startswith(prev_hour_str):
                 return row
     return None
@@ -191,7 +193,6 @@ def append_csv(row_dict):
         except:
             return ""
 
-    # 现在的列索引：时间(0) 心动(1) 心动增幅(2) 团建电力(3) 电力增幅(4) 总电力(5) 总电增幅(6) 发电人数(7) 人数增幅(8)
     row = [
         formatted_time,
         row_dict["今日心动人数1"] or "", calc_delta(row_dict["今日心动人数1"], 1),
@@ -253,6 +254,7 @@ def generate_chart(target_date, save_path, is_final=False):
     yest_date = target_date - timedelta(days=1)
     yest_str = yest_date.strftime("%Y-%m-%d")
     next_str = (target_date + timedelta(days=1)).strftime("%Y-%m-%d")
+
     hours = list(range(0, 25))
 
     plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei", "Microsoft YaHei", "SimHei", "Arial Unicode MS",
@@ -291,8 +293,8 @@ def generate_chart(target_date, save_path, is_final=False):
 
     plot_metric(axes[0], 'heart', '心动人数趋势', '#FF8C42')
     plot_metric(axes[1], 'team1', '团建电力趋势', '#FF8C42')
-    plot_metric(axes[2], 'totalPower', '总电力值趋势', '#2980b9')
-    plot_metric(axes[3], 'people', '发电总人数趋势', '#8E44AD')
+    plot_metric(axes[2], 'totalPower', '总电力值趋势', '#333333')
+    plot_metric(axes[3], 'people', '发电总人数趋势', '#D81B60')
 
     def time_formatter(x, pos):
         if x == 0: return "00:00"
@@ -316,7 +318,11 @@ async def run_once():
     now_bj = datetime.now() + timedelta(hours=8)
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
+        # 添加启动参数，减少被识别为机器人的概率
+        browser = await p.chromium.launch(
+            headless=True,
+            args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+        )
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1",
             viewport={"width": 390, "height": 844},
