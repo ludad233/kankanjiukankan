@@ -172,6 +172,9 @@
                     const dArr = datePart.split('-');
                     const formattedDate = `${dArr[0]}-${dArr[1].padStart(2,'0')}-${dArr[2].padStart(2,'0')}`;
                     
+                    // 【核心修改】直接跳过 11 月 1 日之前的所有数据
+                    if (formattedDate < '2026-11-01') return;
+
                     let timeParts = timeStr.split(' ')[1].split(':');
                     let hour = parseInt(timeParts[0], 10);
                     let timeHour = (hour < 10 ? '0' + hour : hour) + ':00';
@@ -287,7 +290,6 @@
 
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    // 如果是今天 0 点，全部强制写 0
                     if (date === selectedDate && h === '00:00') {
                         if(key === 'heart' || key === 'heartDelta' || key === 'powerDelta') {
                             return 0;
@@ -300,7 +302,6 @@
                     return null;
                 });
 
-                // 把明天的 00:00 数据，直接物理复制到今天的 24:00
                 if (arr[24] === null || arr[24] === undefined) {
                     const nextDayStr = getNextDateStr(date);
                     let nextData = null;
@@ -345,6 +346,8 @@
 
             const allDates = Object.keys(dataMap).sort();
             allDates.forEach(date => {
+                // 【核心修改】如果是 11 月 1 日之前，直接跳过，不渲染灰色虚线
+                if (date < '2026-11-01') return; 
                 if (date === selectedDate || date === prevDateStr) return;
                 heartSeries.push({ 
                     name: date.substring(5) + ' 心动', 
@@ -386,7 +389,6 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    // 图上如果是今天0点或者昨天24点，增幅强制为0显示
                                     if (timeStr === '00:00' || timeStr === '24:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
@@ -447,6 +449,8 @@
             }
 
             allDates.forEach(date => {
+                // 【核心修改】如果是 11 月 1 日之前，直接跳过，不渲染灰色虚线
+                if (date < '2026-11-01') return; 
                 if (date === selectedDate || date === prevDateStr) return;
                 powerSeries.push({ 
                     name: date.substring(5) + ' 团建增幅', 
