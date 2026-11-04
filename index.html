@@ -40,6 +40,15 @@
             padding: 6px 15px; display: inline-block; line-height: 1.4;
             box-shadow: 0 2px 6px rgba(255, 178, 122, 0.2);
         }
+        
+        /* 图表2专用的对比胶囊样式 */
+        .diff-stats-wrap { text-align: center; margin-bottom: 10px; }
+        .diff-stats {
+            text-align: center; font-size: 13px; font-weight: bold; color: #333;
+            background: #FFF5F5; border: 1px dashed #e74c3c; border-radius: 20px;
+            padding: 6px 15px; display: inline-block; line-height: 1.4;
+            box-shadow: 0 2px 6px rgba(231, 76, 60, 0.1);
+        }
 
         .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
         .table-scroll-box::-webkit-scrollbar { display: none; }
@@ -72,19 +81,6 @@
         .custom-tooltip-item { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; font-size: 13px; color: #666; }
         .custom-tooltip-val { font-weight: bold; color: #333; margin-left: 10px; }
         .custom-tooltip-delta { margin-left: 6px; font-size: 11px; }
-        
-        /* 胶囊对比样式 */
-        .tooltip-capsule {
-            margin-top: 8px;
-            padding: 6px 10px;
-            background: #FDF2E9;
-            border: 1px dashed #FFB27A;
-            border-radius: 8px;
-            font-size: 12px;
-            color: #D35400;
-            text-align: center;
-            font-weight: bold;
-        }
     </style>
 </head>
 <body>
@@ -134,6 +130,10 @@
 
         <div class="card">
             <div class="title">团建电力增幅趋势</div>
+            <!-- 增幅差距的专属展示位 -->
+            <div class="diff-stats-wrap">
+                <div class="diff-stats" id="diffStatsContainer">增幅差距计算中...</div>
+            </div>
             <div style="width: 100%;"><div class="chart-wrapper" id="chartPower" style="height: 300px;"></div></div>
         </div>
     </div>
@@ -273,14 +273,51 @@
             const shortPrevDate = prevDateStr.substring(5);
 
             let todayTotalDelta = 0;
+            let prevTotalDelta = 0;
+            let lastHourToday = 0;
+            let lastHourPrev = 0;
+
             if (dataMap[selectedDate]) {
-                Object.values(dataMap[selectedDate]).forEach(d => {
-                    if (d.powerDelta) todayTotalDelta += d.powerDelta;
+                Object.entries(dataMap[selectedDate]).forEach(([h, d]) => {
+                    if (d.powerDelta) {
+                        todayTotalDelta += d.powerDelta;
+                        let hr = parseInt(h.split(':')[0]);
+                        if (hr > lastHourToday && hr < 24) lastHourToday = hr;
+                    }
+                });
+            }
+            if (dataMap[prevDateStr]) {
+                Object.entries(dataMap[prevDateStr]).forEach(([h, d]) => {
+                    if (d.powerDelta) {
+                        prevTotalDelta += d.powerDelta;
+                        let hr = parseInt(h.split(':')[0]);
+                        if (hr > lastHourPrev && hr < 24) lastHourPrev = hr;
+                    }
                 });
             }
             
             document.getElementById('tableSumStats').innerText = 
                 `${shortSelectedDate} 团建总增幅: ${fmtW(todayTotalDelta)}`;
+
+            // 【核心功能】计算并渲染图表顶部的差距胶囊
+            const diffContainer = document.getElementById('diffStatsContainer');
+            
+            // 计算昨天截至当前最后小时的总增幅
+            let prevCumulativeAtCur = 0;
+            if (dataMap[prevDateStr]) {
+                for(let i=0; i <= lastHourToday; i++) {
+                    let hStr = (i < 10 ? '0'+i : i) + ':00';
+                    if (dataMap[prevDateStr][hStr] && dataMap[prevDateStr][hStr].powerDelta) {
+                        prevCumulativeAtCur += dataMap[prevDateStr][hStr].powerDelta;
+                    }
+                }
+            }
+            
+            let diff = todayTotalDelta - prevCumulativeAtCur;
+            let diffColor = diff >= 0 ? '#e74c3c' : '#27ae60';
+            let diffText = diff >= 0 ? `领先 ${diff.toLocaleString()}` : `落后 ${Math.abs(diff).toLocaleString()}`;
+            
+            diffContainer.innerHTML = `截至当前，今天比昨天同时段<br><span style="color:${diffColor}; font-size:16px; margin-top:4px; display:inline-block;">${diffText}</span>`;
 
             const xAxisHours = [];
             for (let i = 0; i <= 24; i++) {
@@ -486,11 +523,6 @@
                         let timeStr = params[0].axisValue;
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
                         
-                        let todayCumulative = 0;
-                        let prevCumulative = 0;
-                        let currentHour = parseInt(timeStr.split(':')[0]);
-                        if (timeStr === '24:00') currentHour = 24;
-
                         params.forEach(p => {
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
                             if (!isDataValid) return;
@@ -513,21 +545,6 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('团建增幅')) {
-                                    // 【核心修复】从 0 点累加到当前时刻的所有增幅
-                                    for(let i=0; i<=currentHour; i++){
-                                        let hStr = (i < 10 ? '0'+i : i) + ':00';
-                                        let dayObj = dataMap[dateStr] && dataMap[dateStr][hStr];
-                                        // 处理 24 点借位
-                                        if (i === 24 && dateStr === prevDateStr && dataMap[selectedDate]) {
-                                            dayObj = dataMap[selectedDate]['00:00'];
-                                        }
-                                        
-                                        if (dayObj && dayObj.powerDelta) {
-                                            if(dateStr === selectedDate) todayCumulative += dayObj.powerDelta;
-                                            else prevCumulative += dayObj.powerDelta;
-                                        }
-                                    }
-
                                     if (timeStr === '00:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
@@ -549,20 +566,6 @@
                                 </div>
                             `;
                         });
-
-                        // 【新增】胶囊对比差距（严丝合缝地累加当前时刻的所有增幅）
-                        if (todayCumulative > 0 || prevCumulative > 0) {
-                            let diff = todayCumulative - prevCumulative;
-                            let diffColor = diff >= 0 ? '#e74c3c' : '#27ae60';
-                            let diffText = diff >= 0 ? `领先 ${diff.toLocaleString()}` : `落后 ${Math.abs(diff).toLocaleString()}`;
-                            
-                            html += `
-                                <div class="tooltip-capsule">
-                                    累计增幅差距: <span style="color:${diffColor}; font-size:14px; margin-left:4px;">${diffText}</span>
-                                </div>
-                            `;
-                        }
-
                         return html;
                     }
                 },
