@@ -319,15 +319,16 @@
 
             const heartSeries = [];
             if (dataMap[selectedDate]) {
-                heartSeries.push({ name: shortSelectedDate + ' 心动', type: 'line', data: getSeriesData(selectedDate, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 } });
+                // 【修复点】这里只传纯日期
+                heartSeries.push({ name: shortSelectedDate, type: 'line', data: getSeriesData(selectedDate, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 } });
             }
             if (dataMap[prevDateStr]) {
-                heartSeries.push({ name: shortPrevDate + ' 心动', type: 'line', data: getSeriesData(prevDateStr, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
+                heartSeries.push({ name: shortPrevDate, type: 'line', data: getSeriesData(prevDateStr, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
             }
 
             const historicalDates = Object.keys(dataMap).filter(d => d < selectedDate && d !== prevDateStr && d >= '2026-11-01').sort();
             historicalDates.forEach(date => {
-                heartSeries.push({ name: date.substring(5) + ' 心动', type: 'line', data: getSeriesData(date, 'heart'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
+                heartSeries.push({ name: date.substring(5), type: 'line', data: getSeriesData(date, 'heart'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
             });
 
             chartHeart.hideLoading();
@@ -336,6 +337,9 @@
                     trigger: 'axis', confine: true,
                     formatter: function (params) {
                         let timeStr = params[0].axisValue;
+                        // 【修复点】对 params 进行按日期倒序排列
+                        params.sort((a, b) => b.seriesName.localeCompare(a.seriesName));
+                        
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
                         
                         params.forEach(p => {
@@ -345,10 +349,11 @@
                             let valStr = Number(p.value).toLocaleString();
                             let deltaVal = '';
                             
+                            // 【修复点】去除多余的 ' 心动' 匹配逻辑
                             let dateStr = "";
-                            if (p.seriesName === shortSelectedDate + ' 心动') dateStr = selectedDate;
-                            else if (p.seriesName === shortPrevDate + ' 心动') dateStr = prevDateStr;
-                            else dateStr = "2026-" + p.seriesName.split(' ')[0];
+                            if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
+                            else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
+                            else dateStr = "2026-" + p.seriesName;
 
                             let lookupTime = timeStr;
                             if (timeStr === '24:00' && dateStr === prevDateStr) {
@@ -359,7 +364,7 @@
                             let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
                             
                             if (dataObj) {
-                                if (p.seriesName.includes('心动')) {
+                                if (p.seriesName) {
                                     if (timeStr === '00:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (timeStr === '01:00') {
@@ -415,7 +420,7 @@
                     trigger: 'axis', confine: true,
                     formatter: function (params) {
                         let timeStr = params[0].axisValue;
-                        // 对 params 按 seriesName 进行倒序排列
+                        // 【修复点】对 params 进行按日期倒序排列
                         params.sort((a, b) => b.seriesName.localeCompare(a.seriesName));
                         
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
@@ -427,7 +432,7 @@
                             let valStr = Number(p.value).toLocaleString();
                             let deltaVal = "";
                             
-                            // 判断当前是哪个日期
+                            // 【修复点】去除多余的 ' 团建增幅' 匹配逻辑
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
