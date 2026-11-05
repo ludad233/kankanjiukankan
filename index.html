@@ -270,7 +270,7 @@
 
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    if (date === selectedDate && h === '00:00') {
+                    if (h === '00:00') {
                         if (key === 'heart' || key === 'heartDelta' || key === 'power' || key === 'powerDelta') return 0; 
                     }
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
@@ -282,7 +282,9 @@
                 if (arr[24] === null || arr[24] === undefined) {
                     const nextDayStr = getNextDateStr(date);
                     if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00']) {
-                        arr[24] = dataMap[nextDayStr]['00:00'][key];
+                        let val = dataMap[nextDayStr]['00:00'][key];
+                        if (key === 'heartDelta' || key === 'powerDelta') val = 0;
+                        arr[24] = val;
                     }
                 }
                 return arr;
@@ -360,8 +362,11 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    if (timeStr === '00:00' && dateStr === selectedDate) {
+                                    if (timeStr === '00:00' || timeStr === '24:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                    } else if (timeStr === '01:00') {
+                                        // 1点心动增幅 = 当前人数 - 0
+                                        deltaVal = `<span class="custom-tooltip-delta up">+${valStr}</span>`;
                                     } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
                                     }
@@ -427,22 +432,11 @@
                             else if (p.seriesName === shortPrevDate + ' 团建增幅') dateStr = prevDateStr;
                             else dateStr = "2026-" + p.seriesName.split(' ')[0];
 
-                            // 如果是今天 0 点，强制显示 0
-                            if (timeStr === '00:00' && dateStr === selectedDate) {
+                            if (timeStr === '00:00' || timeStr === '24:00') {
                                 valStr = "0";
                                 deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                             } else {
                                 valStr = Number(p.value).toLocaleString();
-                                let lookupTime = timeStr;
-                                if (timeStr === '24:00' && dateStr === prevDateStr) {
-                                    lookupTime = '00:00';
-                                    if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) dateStr = selectedDate;
-                                }
-                                // 【修改点】这里不再显示红色的+数字
-                                let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
-                                if (dataObj && dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
-                                    // 什么都不做，不再加 deltaVal
-                                }
                             }
                             
                             html += `<div class="custom-tooltip-item"><div style="display:flex; align-items:center;">${p.marker}<span style="margin-left:4px;">${p.seriesName}</span></div><div><span class="custom-tooltip-val">${valStr}</span>${deltaVal}</div></div>`;
