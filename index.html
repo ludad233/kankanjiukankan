@@ -268,10 +268,11 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
-            // 【真·终极绝杀】：无论是 0 点还是 24 点，一律归零！
+            // 【真·终极修复】：0点强制归0，24点保留真实借位数据！
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    if (h === '00:00' || h === '24:00') {
+                    // 只有 0 点强制归零
+                    if (h === '00:00') {
                         if (key === 'heart' || key === 'heartDelta' || key === 'power' || key === 'powerDelta') return 0; 
                     }
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
@@ -279,6 +280,14 @@
                     }
                     return null;
                 });
+
+                // 24点直接借下一天0点的数据，绝不归零
+                if (arr[24] === null || arr[24] === undefined) {
+                    const nextDayStr = getNextDateStr(date);
+                    if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00']) {
+                        arr[24] = dataMap[nextDayStr]['00:00'][key];
+                    }
+                }
                 return arr;
             }
 
@@ -354,8 +363,8 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    // 0点和24点统统显示0
-                                    if (timeStr === '00:00' || timeStr === '24:00') {
+                                    // 0点强制为0，24点用真实借来的
+                                    if (timeStr === '00:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (timeStr === '01:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${valStr}</span>`;
@@ -424,8 +433,8 @@
                             else if (p.seriesName === shortPrevDate + ' 团建增幅') dateStr = prevDateStr;
                             else dateStr = "2026-" + p.seriesName.split(' ')[0];
 
-                            // 0点和24点统统显示0
-                            if (timeStr === '00:00' || timeStr === '24:00') {
+                            // 0点强制为0，24点用真实借来的
+                            if (timeStr === '00:00') {
                                 valStr = "0";
                                 deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                             }
