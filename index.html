@@ -365,7 +365,6 @@
                                     if (timeStr === '00:00' || timeStr === '24:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (timeStr === '01:00') {
-                                        // 1点心动增幅 = 当前人数 - 0
                                         deltaVal = `<span class="custom-tooltip-delta up">+${valStr}</span>`;
                                     } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
                                         deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
