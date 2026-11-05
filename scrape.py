@@ -34,7 +34,7 @@ def parse_num(text):
 
 async def scrape_team(page, url):
     result = {"今日心动人数": None, "团建电力值": None}
-    max_retries = 5  # 【升级】提升到 5 次重试
+    max_retries = 5
 
     for attempt in range(max_retries):
         try:
@@ -70,7 +70,7 @@ async def scrape_team(page, url):
             else:
                 print(f"⚠️ 第 {attempt + 1} 次抓取数据异常，准备重试...")
                 await page.reload()
-                await page.wait_for_timeout(10000) # 【升级】重试前多等 10 秒
+                await page.wait_for_timeout(10000)
 
         except Exception as e:
             print(f"⚠️ 第 {attempt + 1} 次抓取抛出异常: {e}")
@@ -81,7 +81,7 @@ async def scrape_team(page, url):
 
 async def scrape_power(page):
     result = {"总电力值": None, "发电总人数": None}
-    max_retries = 5  # 【升级】提升到 5 次重试
+    max_retries = 5
 
     for attempt in range(max_retries):
         try:
@@ -189,12 +189,25 @@ def append_csv(row_dict):
         except:
             return ""
 
+    # 【核心修复】：如果是 1 点，直接用当前值减去 0（也就是当前值本身）
+    if curr_dt.hour == 1:
+        heart_delta = row_dict["今日心动人数1"] or ""
+        power_delta = row_dict["团建电力值1"] or ""
+        total_delta = row_dict["总电力值"] or ""
+        people_delta = row_dict["发电总人数"] or ""
+    else:
+        # 0 点和其他时间，正常去表格里找上一小时的数据相减（0点会正常算出前一天23点到0点的差值）
+        heart_delta = calc_delta(row_dict["今日心动人数1"], 1)
+        power_delta = calc_delta(row_dict["团建电力值1"], 3)
+        total_delta = calc_delta(row_dict["总电力值"], 5)
+        people_delta = calc_delta(row_dict["发电总人数"], 7)
+
     row = [
         formatted_time,
-        row_dict["今日心动人数1"] or "", calc_delta(row_dict["今日心动人数1"], 1),
-        row_dict["团建电力值1"] or "", calc_delta(row_dict["团建电力值1"], 3),
-        row_dict["总电力值"] or "", calc_delta(row_dict["总电力值"], 5),
-        row_dict["发电总人数"] or "", calc_delta(row_dict["发电总人数"], 7),
+        row_dict["今日心动人数1"] or "", heart_delta,
+        row_dict["团建电力值1"] or "", power_delta,
+        row_dict["总电力值"] or "", total_delta,
+        row_dict["发电总人数"] or "", people_delta,
     ]
 
     with open(CSV_FILE, "a", encoding="utf-8-sig", newline="") as f:
