@@ -268,10 +268,9 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
-            // 【终极修复】：今天0点强制为0，24点照常借真实数据
+            // 【终极物理隔离】：今天24点留空，昨天24点借真实数据
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    // 只有看今天的数据，且是 00:00 时，才强制归零
                     if (date === selectedDate && h === '00:00') {
                         if (key === 'heart' || key === 'heartDelta' || key === 'power' || key === 'powerDelta') return 0; 
                     }
@@ -281,11 +280,16 @@
                     return null;
                 });
 
-                // 借下一天的真实数据给 24 点
-                if (arr[24] === null || arr[24] === undefined) {
-                    const nextDayStr = getNextDateStr(date);
-                    if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00']) {
-                        arr[24] = dataMap[nextDayStr]['00:00'][key];
+                // 关键：如果是今天，24点直接留空（null），不显示数据点，这样悬浮框里就不会有今天的 24 点
+                if (date === selectedDate) {
+                    arr[24] = null;
+                } else {
+                    // 其他日期（昨天、前天等），借下一天的真实数据
+                    if (arr[24] === null || arr[24] === undefined) {
+                        const nextDayStr = getNextDateStr(date);
+                        if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00']) {
+                            arr[24] = dataMap[nextDayStr]['00:00'][key];
+                        }
                     }
                 }
                 return arr;
@@ -363,7 +367,6 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    // 【严格区分】：只有今天 0 点才强制为 0
                                     if (timeStr === '00:00' && dateStr === selectedDate) {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (timeStr === '01:00') {
@@ -433,7 +436,6 @@
                             else if (p.seriesName === shortPrevDate + ' 团建增幅') dateStr = prevDateStr;
                             else dateStr = "2026-" + p.seriesName.split(' ')[0];
 
-                            // 【严格区分】：只有今天 0 点才强制为 0
                             if (timeStr === '00:00' && dateStr === selectedDate) {
                                 valStr = "0";
                                 deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
