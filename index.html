@@ -288,6 +288,11 @@
                 return arr;
             }
 
+            // 【核心修改】：只保留最近 5 天（包含选中日）
+            const fiveDaysAgoObj = new Date(selDateObj);
+            fiveDaysAgoObj.setDate(fiveDaysAgoObj.getDate() - 4);
+            const fiveDaysAgoStr = fiveDaysAgoObj.toISOString().split('T')[0];
+
             // ============ 图1：心动人数趋势 ============
             let todayHeart = null, prevHeart = null;
             if (dataMap[selectedDate]) {
@@ -319,14 +324,14 @@
 
             const heartSeries = [];
             if (dataMap[selectedDate]) {
-                // 【修复点】这里只传纯日期
                 heartSeries.push({ name: shortSelectedDate, type: 'line', data: getSeriesData(selectedDate, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 } });
             }
             if (dataMap[prevDateStr]) {
                 heartSeries.push({ name: shortPrevDate, type: 'line', data: getSeriesData(prevDateStr, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
             }
 
-            const historicalDates = Object.keys(dataMap).filter(d => d < selectedDate && d !== prevDateStr && d >= '2026-11-01').sort();
+            // 【核心修改】：筛选条件加上 >= 5天前
+            const historicalDates = Object.keys(dataMap).filter(d => d < selectedDate && d !== prevDateStr && d >= fiveDaysAgoStr).sort();
             historicalDates.forEach(date => {
                 heartSeries.push({ name: date.substring(5), type: 'line', data: getSeriesData(date, 'heart'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
             });
@@ -337,7 +342,6 @@
                     trigger: 'axis', confine: true,
                     formatter: function (params) {
                         let timeStr = params[0].axisValue;
-                        // 【修复点】对 params 进行按日期倒序排列
                         params.sort((a, b) => b.seriesName.localeCompare(a.seriesName));
                         
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
@@ -349,7 +353,6 @@
                             let valStr = Number(p.value).toLocaleString();
                             let deltaVal = '';
                             
-                            // 【修复点】去除多余的 ' 心动' 匹配逻辑
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
@@ -420,7 +423,6 @@
                     trigger: 'axis', confine: true,
                     formatter: function (params) {
                         let timeStr = params[0].axisValue;
-                        // 【修复点】对 params 进行按日期倒序排列
                         params.sort((a, b) => b.seriesName.localeCompare(a.seriesName));
                         
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
@@ -432,7 +434,6 @@
                             let valStr = Number(p.value).toLocaleString();
                             let deltaVal = "";
                             
-                            // 【修复点】去除多余的 ' 团建增幅' 匹配逻辑
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
