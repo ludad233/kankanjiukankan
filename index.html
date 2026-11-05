@@ -268,10 +268,8 @@
                 return `${dt.getFullYear()}-${('0' + (dt.getMonth() + 1)).slice(-2)}-${('0' + dt.getDate()).slice(-2)}`;
             }
 
-            // 【真·终极修复】：0点强制归0，24点保留真实借位数据！
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    // 只有 0 点强制归零
                     if (h === '00:00') {
                         if (key === 'heart' || key === 'heartDelta' || key === 'power' || key === 'powerDelta') return 0; 
                     }
@@ -281,7 +279,6 @@
                     return null;
                 });
 
-                // 24点直接借下一天0点的数据，绝不归零
                 if (arr[24] === null || arr[24] === undefined) {
                     const nextDayStr = getNextDateStr(date);
                     if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00']) {
@@ -363,7 +360,6 @@
                             
                             if (dataObj) {
                                 if (p.seriesName.includes('心动')) {
-                                    // 0点强制为0，24点用真实借来的
                                     if (timeStr === '00:00') {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
                                     } else if (timeStr === '01:00') {
@@ -403,14 +399,14 @@
 
             const powerSeries = [];
             if (dataMap[selectedDate]) {
-                powerSeries.push({ name: shortSelectedDate + ' 团建增幅', type: 'line', data: getSeriesData(selectedDate, 'powerDelta'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 } });
+                powerSeries.push({ name: shortSelectedDate, type: 'line', data: getSeriesData(selectedDate, 'powerDelta'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FF8C42' }, lineStyle: { color: '#FF8C42', width: 2.5 } });
             }
             if (dataMap[prevDateStr]) {
-                powerSeries.push({ name: shortPrevDate + ' 团建增幅', type: 'line', data: getSeriesData(prevDateStr, 'powerDelta'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
+                powerSeries.push({ name: shortPrevDate, type: 'line', data: getSeriesData(prevDateStr, 'powerDelta'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
             }
 
             historicalDates.forEach(date => {
-                powerSeries.push({ name: date.substring(5) + ' 团建增幅', type: 'line', data: getSeriesData(date, 'powerDelta'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
+                powerSeries.push({ name: date.substring(5), type: 'line', data: getSeriesData(date, 'powerDelta'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
             });
 
             chartPower.hideLoading();
@@ -419,6 +415,9 @@
                     trigger: 'axis', confine: true,
                     formatter: function (params) {
                         let timeStr = params[0].axisValue;
+                        // 对 params 按 seriesName 进行倒序排列
+                        params.sort((a, b) => b.seriesName.localeCompare(a.seriesName));
+                        
                         let html = `<div class="custom-tooltip-title">${timeStr}</div>`;
                         
                         params.forEach(p => {
@@ -428,12 +427,12 @@
                             let valStr = Number(p.value).toLocaleString();
                             let deltaVal = "";
                             
+                            // 判断当前是哪个日期
                             let dateStr = "";
-                            if (p.seriesName === shortSelectedDate + ' 团建增幅') dateStr = selectedDate;
-                            else if (p.seriesName === shortPrevDate + ' 团建增幅') dateStr = prevDateStr;
-                            else dateStr = "2026-" + p.seriesName.split(' ')[0];
+                            if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
+                            else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
+                            else dateStr = "2026-" + p.seriesName;
 
-                            // 0点强制为0，24点用真实借来的
                             if (timeStr === '00:00') {
                                 valStr = "0";
                                 deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
