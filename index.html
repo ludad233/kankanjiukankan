@@ -270,12 +270,15 @@
 
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    if (h === '00:00' && date === selectedDate) {
+                    if (h === '00:00') {
+                        // 心动人数和心动增幅 00:00 强制为 0
                         if (key === 'heart' || key === 'heartDelta') return 0;
+                        // 团建电力的值按表格数据（如果是选中日没取到则给0）
                         if (key === 'power') {
                             return (dataMap[date] && dataMap[date]['00:00'] && dataMap[date]['00:00'].power !== undefined)
                                 ? dataMap[date]['00:00'].power : 0;
                         }
+                        // 【核心修改】：所有日期的团建电力增幅 00:00 强制为 0
                         if (key === 'powerDelta') return 0;
                     }
 
@@ -378,7 +381,6 @@
                     data: getSeriesData(bestHeartDate, 'heart'),
                     smooth: false, symbol: 'none',
                     itemStyle: { color: '#FFDAB9' },
-                    // 调整线宽为1.5，并使用 type: [4, 2] 实现密集虚线
                     lineStyle: { color: '#FFDAB9', width: 1.5, type: [4, 2] }
                 });
             }
@@ -473,7 +475,6 @@
                     data: getSeriesData(bestPowerDate, 'powerDelta'),
                     smooth: false, symbol: 'none',
                     itemStyle: { color: '#FFDAB9' },
-                    // 同样调整线宽和虚线密度
                     lineStyle: { color: '#FFDAB9', width: 1.5, type: [4, 2] }
                 });
             }
@@ -492,8 +493,8 @@
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
                             if (!isDataValid) return;
 
-                            // 电力图本身就是增幅数据，直接显示数字，不加 + 号
-                            let valStr = Number(p.value).toLocaleString();
+                            // 【核心修改】：电力图 00:00 无论哪条线，数值强制展示 0
+                            let valStr = (timeStr === '00:00') ? '0' : Number(p.value).toLocaleString();
                             
                             html += `<div class="custom-tooltip-item"><div style="display:flex; align-items:center;">${p.marker}<span style="margin-left:4px;">${p.seriesName}</span></div><div><span class="custom-tooltip-val">${valStr}</span></div></div>`;
                         });
