@@ -155,15 +155,14 @@ def get_prev_hour_record(curr_dt, all_rows):
     def fmt_no_pad(dt_obj):
         return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day} {dt_obj.hour}"
 
-    for i in range(1, 13):
+    # 最多往前找 25 小时，允许跨天（0 点会找到前一天 23 点）
+    for i in range(1, 26):
         prev_hour_dt = curr_dt - timedelta(hours=i)
         prev_hour_str = fmt_no_pad(prev_hour_dt)
 
-        if prev_hour_dt.day != curr_dt.day:
-            break
-
         for row in reversed(all_rows):
-            if not row or len(row) < 9: continue
+            if not row or len(row) < 9:
+                continue
             if row[0].startswith(prev_hour_str):
                 return row
     return None
@@ -181,26 +180,25 @@ def append_csv(row_dict):
     prev_row = get_prev_hour_record(curr_dt, all_rows)
 
     def calc_delta(curr_val, col_idx):
-        if curr_val is None or prev_row is None: return ""
+        # 当前值缺失，增幅留空
+        if curr_val is None:
+            return ""
+        # 第一天 0 点没有上一整点记录，增幅留空（不放当前值顶替）
+        if prev_row is None:
+            return ""
         try:
             prev_val_str = prev_row[col_idx]
-            if prev_val_str == "" or prev_val_str is None: return ""
+            if prev_val_str == "" or prev_val_str is None:
+                return ""
             return int(curr_val) - int(prev_val_str)
         except:
             return ""
 
-    # 【核心修复】：如果是 1 点，直接用当前值减去 0（也就是当前值本身）
-    if curr_dt.hour == 1:
-        heart_delta = row_dict["今日心动人数1"] or ""
-        power_delta = row_dict["团建电力值1"] or ""
-        total_delta = row_dict["总电力值"] or ""
-        people_delta = row_dict["发电总人数"] or ""
-    else:
-        # 0 点和其他时间，正常去表格里找上一小时的数据相减（0点会正常算出前一天23点到0点的差值）
-        heart_delta = calc_delta(row_dict["今日心动人数1"], 1)
-        power_delta = calc_delta(row_dict["团建电力值1"], 3)
-        total_delta = calc_delta(row_dict["总电力值"], 5)
-        people_delta = calc_delta(row_dict["发电总人数"], 7)
+    # 所有时段（含 0 点、1 点）统一：当前值 − 上一整点值
+    heart_delta = calc_delta(row_dict["今日心动人数1"], 1)
+    power_delta = calc_delta(row_dict["团建电力值1"], 3)
+    total_delta = calc_delta(row_dict["总电力值"], 5)
+    people_delta = calc_delta(row_dict["发电总人数"], 7)
 
     row = [
         formatted_time,
