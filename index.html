@@ -378,7 +378,8 @@
                     data: getSeriesData(bestHeartDate, 'heart'),
                     smooth: false, symbol: 'none',
                     itemStyle: { color: '#FFDAB9' },
-                    lineStyle: { color: '#FFDAB9', width: 2.5, type: 'dashed' }
+                    // 调整线宽为1.5，并使用 type: [4, 2] 实现密集虚线
+                    lineStyle: { color: '#FFDAB9', width: 1.5, type: [4, 2] }
                 });
             }
 
@@ -472,7 +473,8 @@
                     data: getSeriesData(bestPowerDate, 'powerDelta'),
                     smooth: false, symbol: 'none',
                     itemStyle: { color: '#FFDAB9' },
-                    lineStyle: { color: '#FFDAB9', width: 2.5, type: 'dashed' }
+                    // 同样调整线宽和虚线密度
+                    lineStyle: { color: '#FFDAB9', width: 1.5, type: [4, 2] }
                 });
             }
 
