@@ -490,34 +490,10 @@
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
                             if (!isDataValid) return;
 
+                            // 电力图本身就是增幅数据，直接显示数字，不加 + 号
                             let valStr = Number(p.value).toLocaleString();
-                            let deltaVal = "";
                             
-                            let dateStr = "";
-                            if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
-                            else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
-                            else {
-                                const cleanName = p.seriesName.replace(' (最佳)', '');
-                                dateStr = "2026-" + cleanName;
-                            }
-
-                            let dataObj = dataMap[dateStr] && dataMap[dateStr][timeStr];
-
-                            if (timeStr === '00:00') {
-                                if (p.seriesName === shortSelectedDate) {
-                                    deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                } else if (dataObj && dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
-                                    const sign = dataObj.powerDelta >= 0 ? '+' : '';
-                                    const cls = dataObj.powerDelta >= 0 ? 'up' : 'down';
-                                    deltaVal = `<span class="custom-tooltip-delta ${cls}">${sign}${dataObj.powerDelta.toLocaleString()}</span>`;
-                                }
-                            } else if (dataObj && dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
-                                const sign = dataObj.powerDelta >= 0 ? '+' : '';
-                                const cls = dataObj.powerDelta >= 0 ? 'up' : 'down';
-                                deltaVal = `<span class="custom-tooltip-delta ${cls}">${sign}${dataObj.powerDelta.toLocaleString()}</span>`;
-                            }
-                            
-                            html += `<div class="custom-tooltip-item"><div style="display:flex; align-items:center;">${p.marker}<span style="margin-left:4px;">${p.seriesName}</span></div><div><span class="custom-tooltip-val">${valStr}</span>${deltaVal}</div></div>`;
+                            html += `<div class="custom-tooltip-item"><div style="display:flex; align-items:center;">${p.marker}<span style="margin-left:4px;">${p.seriesName}</span></div><div><span class="custom-tooltip-val">${valStr}</span></div></div>`;
                         });
                         return html;
                     }
