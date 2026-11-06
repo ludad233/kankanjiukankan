@@ -246,7 +246,10 @@
             
             if (dataMap[selectedDate]) {
                 Object.entries(dataMap[selectedDate]).forEach(([h, d]) => {
-                    if (d.powerDelta) todayTotalDelta += d.powerDelta;
+                    // 【核心修复1】：跳过 00:00 的增幅计算
+                    if (h !== '00:00' && d.powerDelta) {
+                        todayTotalDelta += d.powerDelta;
+                    }
                     let hr = parseInt(h.split(':')[0]);
                     if (hr > lastHourToday && hr < 24) lastHourToday = hr;
                 });
@@ -271,15 +274,12 @@
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
                     if (h === '00:00') {
-                        // 心动人数和心动增幅 00:00 强制为 0
                         if (key === 'heart' || key === 'heartDelta') return 0;
-                        // 团建电力的值按表格数据（如果是选中日没取到则给0）
+                        if (key === 'powerDelta') return 0;
                         if (key === 'power') {
                             return (dataMap[date] && dataMap[date]['00:00'] && dataMap[date]['00:00'].power !== undefined)
                                 ? dataMap[date]['00:00'].power : 0;
                         }
-                        // 【核心修改】：所有日期的团建电力增幅 00:00 强制为 0
-                        if (key === 'powerDelta') return 0;
                     }
 
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
@@ -301,7 +301,6 @@
             fiveDaysAgoObj.setDate(fiveDaysAgoObj.getDate() - 4);
             const fiveDaysAgoStr = fiveDaysAgoObj.toISOString().split('T')[0];
 
-            // 计算历史最佳日（排除今天和昨天）
             const candidateDates = Object.keys(dataMap).filter(d => d < selectedDate && d !== prevDateStr && d >= fiveDaysAgoStr);
 
             function getHeartAt24(dateStr) {
@@ -321,8 +320,12 @@
             function getTotalPowerDelta(dateStr) {
                 if (!dataMap[dateStr]) return null;
                 let sum = 0, has = false;
-                Object.values(dataMap[dateStr]).forEach(d => {
-                    if (d.powerDelta != null) { sum += d.powerDelta; has = true; }
+                Object.entries(dataMap[dateStr]).forEach(([h, d]) => {
+                    // 【核心修复2】：找历史最佳日总涨幅时，也跳过 00:00
+                    if (h !== '00:00' && d.powerDelta != null) { 
+                        sum += d.powerDelta; 
+                        has = true; 
+                    }
                 });
                 return has ? sum : null;
             }
@@ -400,36 +403,35 @@
                             if (!isDataValid) return;
 
                             let valStr = Number(p.value).toLocaleString();
-                            if (timeStr === '00:00' && p.seriesName === shortSelectedDate) {
-                                valStr = '0';
-                            }
-
                             let deltaVal = '';
                             
-                            let dateStr = "";
-                            if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
-                            else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
-                            else {
-                                const cleanName = p.seriesName.replace(' (最佳)', '');
-                                dateStr = "2026-" + cleanName;
-                            }
+                            if (timeStr === '00:00') {
+                                valStr = '0';
+                                deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                            } else {
+                                let dateStr = "";
+                                if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
+                                else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
+                                else {
+                                    const cleanName = p.seriesName.replace(' (最佳)', '');
+                                    dateStr = "2026-" + cleanName;
+                                }
 
-                            let lookupTime = timeStr;
-                            if (timeStr === '24:00' && dateStr === prevDateStr) {
-                                lookupTime = '00:00';
-                                if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) dateStr = selectedDate;
-                            }
+                                let lookupTime = timeStr;
+                                if (timeStr === '24:00' && dateStr === prevDateStr) {
+                                    lookupTime = '00:00';
+                                    if (dataMap[selectedDate] && dataMap[selectedDate]['00:00']) dateStr = selectedDate;
+                                }
 
-                            let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
-                            
-                            if (dataObj) {
-                                if (p.seriesName) {
-                                    if (timeStr === '00:00' && p.seriesName === shortSelectedDate) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
-                                        const sign = dataObj.heartDelta >= 0 ? '+' : '';
-                                        const cls = dataObj.heartDelta >= 0 ? 'up' : 'down';
-                                        deltaVal = `<span class="custom-tooltip-delta ${cls}">${sign}${dataObj.heartDelta.toLocaleString()}</span>`;
+                                let dataObj = dataMap[dateStr] && (dataMap[dateStr][lookupTime]);
+                                
+                                if (dataObj) {
+                                    if (p.seriesName) {
+                                        if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
+                                            const sign = dataObj.heartDelta >= 0 ? '+' : '';
+                                            const cls = dataObj.heartDelta >= 0 ? 'up' : 'down';
+                                            deltaVal = `<span class="custom-tooltip-delta ${cls}">${sign}${dataObj.heartDelta.toLocaleString()}</span>`;
+                                        }
                                     }
                                 }
                             }
@@ -451,7 +453,10 @@
             if (dataMap[prevDateStr]) {
                 for(let i=0; i <= lastHourToday; i++) {
                     let hStr = (i < 10 ? '0'+i : i) + ':00';
-                    if (dataMap[prevDateStr][hStr] && dataMap[prevDateStr][hStr].powerDelta) prevCumulativeAtCur += dataMap[prevDateStr][hStr].powerDelta;
+                    // 【核心修复3】：昨天同时段对比，也跳过 00:00
+                    if (hStr !== '00:00' && dataMap[prevDateStr][hStr] && dataMap[prevDateStr][hStr].powerDelta) {
+                        prevCumulativeAtCur += dataMap[prevDateStr][hStr].powerDelta;
+                    }
                 }
             }
             
@@ -493,7 +498,6 @@
                             let isDataValid = p.value !== null && p.value !== undefined && !isNaN(p.value);
                             if (!isDataValid) return;
 
-                            // 【核心修改】：电力图 00:00 无论哪条线，数值强制展示 0
                             let valStr = (timeStr === '00:00') ? '0' : Number(p.value).toLocaleString();
                             
                             html += `<div class="custom-tooltip-item"><div style="display:flex; align-items:center;">${p.marker}<span style="margin-left:4px;">${p.seriesName}</span></div><div><span class="custom-tooltip-val">${valStr}</span></div></div>`;
