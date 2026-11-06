@@ -270,9 +270,15 @@
 
             function getSeriesData(date, key) {
                 let arr = xAxisHours.map(h => {
-                    if (h === '00:00') {
-                        if (key === 'heart' || key === 'heartDelta' || key === 'power' || key === 'powerDelta') return 0; 
+                    if (h === '00:00' && date === selectedDate) {
+                        if (key === 'heart' || key === 'heartDelta') return 0;
+                        if (key === 'power') {
+                            return (dataMap[date] && dataMap[date]['00:00'] && dataMap[date]['00:00'].power !== undefined)
+                                ? dataMap[date]['00:00'].power : 0;
+                        }
+                        if (key === 'powerDelta') return 0;
                     }
+
                     if (dataMap[date] && dataMap[date][h] && dataMap[date][h][key] !== undefined) {
                         return dataMap[date][h][key];
                     }
@@ -288,10 +294,46 @@
                 return arr;
             }
 
-            // 【核心修改】：只保留最近 5 天（包含选中日）
             const fiveDaysAgoObj = new Date(selDateObj);
             fiveDaysAgoObj.setDate(fiveDaysAgoObj.getDate() - 4);
             const fiveDaysAgoStr = fiveDaysAgoObj.toISOString().split('T')[0];
+
+            // 计算历史最佳日（排除今天和昨天）
+            const candidateDates = Object.keys(dataMap).filter(d => d < selectedDate && d !== prevDateStr && d >= fiveDaysAgoStr);
+
+            function getHeartAt24(dateStr) {
+                const nextDayStr = getNextDateStr(dateStr);
+                if (dataMap[nextDayStr] && dataMap[nextDayStr]['00:00'] && dataMap[nextDayStr]['00:00'].heart != null) {
+                    return dataMap[nextDayStr]['00:00'].heart;
+                }
+                if (dataMap[dateStr]) {
+                    for (let i = 23; i >= 0; i--) {
+                        const h = (i < 10 ? '0'+i : i) + ':00';
+                        if (dataMap[dateStr][h] && dataMap[dateStr][h].heart != null) return dataMap[dateStr][h].heart;
+                    }
+                }
+                return null;
+            }
+
+            function getTotalPowerDelta(dateStr) {
+                if (!dataMap[dateStr]) return null;
+                let sum = 0, has = false;
+                Object.values(dataMap[dateStr]).forEach(d => {
+                    if (d.powerDelta != null) { sum += d.powerDelta; has = true; }
+                });
+                return has ? sum : null;
+            }
+
+            let bestHeartDate = null, bestHeartVal = -Infinity;
+            let bestPowerDate = null, bestPowerVal = -Infinity;
+
+            candidateDates.forEach(d => {
+                const hv = getHeartAt24(d);
+                if (hv != null && hv > bestHeartVal) { bestHeartVal = hv; bestHeartDate = d; }
+
+                const pv = getTotalPowerDelta(d);
+                if (pv != null && pv > bestPowerVal) { bestPowerVal = pv; bestPowerDate = d; }
+            });
 
             // ============ 图1：心动人数趋势 ============
             let todayHeart = null, prevHeart = null;
@@ -329,12 +371,16 @@
             if (dataMap[prevDateStr]) {
                 heartSeries.push({ name: shortPrevDate, type: 'line', data: getSeriesData(prevDateStr, 'heart'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
             }
-
-            // 【核心修改】：筛选条件加上 >= 5天前
-            const historicalDates = Object.keys(dataMap).filter(d => d < selectedDate && d !== prevDateStr && d >= fiveDaysAgoStr).sort();
-            historicalDates.forEach(date => {
-                heartSeries.push({ name: date.substring(5), type: 'line', data: getSeriesData(date, 'heart'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
-            });
+            if (bestHeartDate) {
+                heartSeries.push({
+                    name: bestHeartDate.substring(5) + ' (最佳)',
+                    type: 'line',
+                    data: getSeriesData(bestHeartDate, 'heart'),
+                    smooth: false, symbol: 'none',
+                    itemStyle: { color: '#FFC0CB' },
+                    lineStyle: { color: '#FFC0CB', width: 2, type: 'dashed' }
+                });
+            }
 
             chartHeart.hideLoading();
             chartHeart.setOption({
@@ -351,12 +397,19 @@
                             if (!isDataValid) return;
 
                             let valStr = Number(p.value).toLocaleString();
+                            if (timeStr === '00:00' && p.seriesName === shortSelectedDate) {
+                                valStr = '0';
+                            }
+
                             let deltaVal = '';
                             
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
-                            else dateStr = "2026-" + p.seriesName;
+                            else {
+                                const cleanName = p.seriesName.replace(' (最佳)', '');
+                                dateStr = "2026-" + cleanName;
+                            }
 
                             let lookupTime = timeStr;
                             if (timeStr === '24:00' && dateStr === prevDateStr) {
@@ -368,12 +421,12 @@
                             
                             if (dataObj) {
                                 if (p.seriesName) {
-                                    if (timeStr === '00:00') {
+                                    if (timeStr === '00:00' && p.seriesName === shortSelectedDate) {
                                         deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
-                                    } else if (timeStr === '01:00') {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${valStr}</span>`;
                                     } else if (dataObj.heartDelta !== null && dataObj.heartDelta !== undefined) {
-                                        deltaVal = `<span class="custom-tooltip-delta up">+${dataObj.heartDelta.toLocaleString()}</span>`;
+                                        const sign = dataObj.heartDelta >= 0 ? '+' : '';
+                                        const cls = dataObj.heartDelta >= 0 ? 'up' : 'down';
+                                        deltaVal = `<span class="custom-tooltip-delta ${cls}">${sign}${dataObj.heartDelta.toLocaleString()}</span>`;
                                     }
                                 }
                             }
@@ -412,10 +465,16 @@
             if (dataMap[prevDateStr]) {
                 powerSeries.push({ name: shortPrevDate, type: 'line', data: getSeriesData(prevDateStr, 'powerDelta'), smooth: false, symbol: 'circle', symbolSize: 4, itemStyle: { color: '#FFB3C6' }, lineStyle: { color: '#FFB3C6', width: 2 } });
             }
-
-            historicalDates.forEach(date => {
-                powerSeries.push({ name: date.substring(5), type: 'line', data: getSeriesData(date, 'powerDelta'), smooth: false, symbol: 'none', itemStyle: { color: '#A0A0A0' }, lineStyle: { color: '#b0b0b0', width: 1, type: 'dashed' }, emphasis: { disabled: true } });
-            });
+            if (bestPowerDate) {
+                powerSeries.push({
+                    name: bestPowerDate.substring(5) + ' (最佳)',
+                    type: 'line',
+                    data: getSeriesData(bestPowerDate, 'powerDelta'),
+                    smooth: false, symbol: 'none',
+                    itemStyle: { color: '#FFC0CB' },
+                    lineStyle: { color: '#FFC0CB', width: 2, type: 'dashed' }
+                });
+            }
 
             chartPower.hideLoading();
             chartPower.setOption({
@@ -437,11 +496,25 @@
                             let dateStr = "";
                             if (p.seriesName === shortSelectedDate) dateStr = selectedDate;
                             else if (p.seriesName === shortPrevDate) dateStr = prevDateStr;
-                            else dateStr = "2026-" + p.seriesName;
+                            else {
+                                const cleanName = p.seriesName.replace(' (最佳)', '');
+                                dateStr = "2026-" + cleanName;
+                            }
+
+                            let dataObj = dataMap[dateStr] && dataMap[dateStr][timeStr];
 
                             if (timeStr === '00:00') {
-                                valStr = "0";
-                                deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                if (p.seriesName === shortSelectedDate) {
+                                    deltaVal = `<span class="custom-tooltip-delta up">0</span>`;
+                                } else if (dataObj && dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                    const sign = dataObj.powerDelta >= 0 ? '+' : '';
+                                    const cls = dataObj.powerDelta >= 0 ? 'up' : 'down';
+                                    deltaVal = `<span class="custom-tooltip-delta ${cls}">${sign}${dataObj.powerDelta.toLocaleString()}</span>`;
+                                }
+                            } else if (dataObj && dataObj.powerDelta !== null && dataObj.powerDelta !== undefined) {
+                                const sign = dataObj.powerDelta >= 0 ? '+' : '';
+                                const cls = dataObj.powerDelta >= 0 ? 'up' : 'down';
+                                deltaVal = `<span class="custom-tooltip-delta ${cls}">${sign}${dataObj.powerDelta.toLocaleString()}</span>`;
                             }
                             
                             html += `<div class="custom-tooltip-item"><div style="display:flex; align-items:center;">${p.marker}<span style="margin-left:4px;">${p.seriesName}</span></div><div><span class="custom-tooltip-val">${valStr}</span>${deltaVal}</div></div>`;
