@@ -179,11 +179,13 @@ def append_csv(row_dict):
     formatted_time = f"{curr_dt.year}/{curr_dt.month}/{curr_dt.day} {curr_dt.hour:02d}:{curr_dt.minute:02d}"
     prev_row = get_prev_hour_record(curr_dt, all_rows)
 
-    def calc_delta(curr_val, col_idx):
-        # 当前值缺失，增幅留空
+    def calc_delta(curr_val, col_idx, heart_special=False):
         if curr_val is None:
             return ""
-        # 第一天 0 点没有上一整点记录，增幅留空（不放当前值顶替）
+        # 心动人数：1 点增幅 = 1 点值本身
+        if heart_special and curr_dt.hour == 1:
+            return int(curr_val)
+        # 第一天 0 点没有上一整点记录，增幅留空
         if prev_row is None:
             return ""
         try:
@@ -194,11 +196,12 @@ def append_csv(row_dict):
         except:
             return ""
 
-    # 所有时段（含 0 点、1 点）统一：当前值 − 上一整点值
-    heart_delta = calc_delta(row_dict["今日心动人数1"], 1)
-    power_delta = calc_delta(row_dict["团建电力值1"], 3)
-    total_delta = calc_delta(row_dict["总电力值"], 5)
-    people_delta = calc_delta(row_dict["发电总人数"], 7)
+    # 心动人数：1 点特殊（增幅 = 值本身）
+    heart_delta = calc_delta(row_dict["今日心动人数1"], 1, heart_special=True)
+    # 团建电力、总电力、发电总人数：所有时段统一相减
+    power_delta = calc_delta(row_dict["团建电力值1"], 3, heart_special=False)
+    total_delta = calc_delta(row_dict["总电力值"], 5, heart_special=False)
+    people_delta = calc_delta(row_dict["发电总人数"], 7, heart_special=False)
 
     row = [
         formatted_time,
