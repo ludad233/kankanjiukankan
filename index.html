@@ -18,10 +18,30 @@
             box-shadow: 0 4px 15px rgba(0,0,0,0.08); padding: 15px; width: 100%; max-width: 350px; 
             margin: 0 auto 15px auto; text-align: left; box-sizing: border-box;
         }
-        .hover-title { font-size: 15px; font-weight: bold; color: #D35400; margin-bottom: 10px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-        .hover-row { font-size: 13px; color: #555; display: flex; justify-content: space-between; margin-bottom: 8px; }
+        
+        /* 顶部大字：发电总值 */
+        .top-total { 
+            font-size: 18px; 
+            font-weight: bold; 
+            color: #FF69B4; /* 粉色 */
+            text-align: center; 
+            margin-bottom: 5px; 
+        }
+
+        .hover-title { 
+            font-size: 18px; /* 与上方字号一致 */
+            font-weight: bold; 
+            color: #D35400; 
+            margin-bottom: 12px; 
+            text-align: center; 
+            border-bottom: 1px solid #eee; 
+            padding-bottom: 10px; 
+        }
+
+        .hover-row { font-size: 13px; color: #555; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .hover-row:last-child { margin-bottom: 0; }
-        .hover-val { font-weight: bold; color: #333; }
+        .hover-val { font-weight: bold; color: #333; text-align: right; line-height: 1.2; }
+        .hover-sub { font-size: 11px; color: #888; font-weight: normal; margin-top: 2px; display: block; }
 
         /* Tab 样式 */
         .tabs { display: flex; justify-content: center; margin-bottom: 12px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 10px; gap: 10px; }
@@ -54,11 +74,23 @@
         <div class="page-header">数据追踪系统</div>
         
         <div class="hover-box" id="goalHoverBox">
+            <!-- 移上来的发电总值，粉色大字 -->
+            <div class="top-total">
+                发电总值：<span id="hoverLatestTotal">计算中...</span>
+            </div>
+            
+            <!-- 总目标增幅 -->
             <div class="hover-title">总目标增幅 2.2亿</div>
-            <div class="hover-row"><span>目前发电增幅：</span><span class="hover-val" id="hoverCurrentIncrease">计算中...</span></div>
+            
+            <div class="hover-row">
+                <span>目前发电增幅：</span>
+                <div class="hover-val">
+                    <span id="hoverCurrentIncrease">计算中...</span>
+                    <span class="hover-sub" id="hoverRemainDiff"></span>
+                </div>
+            </div>
             <div class="hover-row"><span>初始总电力：</span><span class="hover-val">763,797,264</span></div>
             <div class="hover-row"><span>今日发电总值：</span><span class="hover-val" id="hoverTodayTotal">计算中...</span></div>
-            <div class="hover-row"><span>发电总值：</span><span class="hover-val" id="hoverLatestTotal">计算中...</span></div>
         </div>
 
         <div class="tabs">
@@ -110,9 +142,7 @@
     <script>
         const CACHE_BUSTER = 'v=' + new Date().getTime();
         const INITIAL_TOTAL_POWER = 763797264; 
-        // 设定今天特殊计算的开始时间（因为是晚 19 点开始）
-        const SPECIAL_DATE = "2026-11-07";
-        const SPECIAL_START_HOUR = 19;
+        const TARGET_INCREASE = 220000000; // 目标增幅 2.2 亿
 
         let globalDataMap = {}; 
         let globalAllRows = [];
@@ -180,7 +210,7 @@
             return sum;
         }
 
-        // 更新顶部面板（加入 11月7日 特殊计算逻辑）
+        // 更新顶部面板
         function updateHoverData() {
             if(globalAllRows.length === 0) return;
 
@@ -192,33 +222,29 @@
             const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
             document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
 
+            // 计算距离目标还差多少
+            if (currentIncrease < TARGET_INCREASE) {
+                const remain = TARGET_INCREASE - currentIncrease;
+                document.getElementById('hoverRemainDiff').innerText = `(距2.2亿还差 ${formatNum(remain)})`;
+            } else {
+                document.getElementById('hoverRemainDiff').innerText = `(已达标)`;
+            }
+
             const todayStr = latestRow.rawTime.split(' ')[0].replace(/\//g, '-');
             const todayData = globalDataMap[todayStr];
             
             if (todayData) {
+                const availableHours = Object.keys(todayData).sort();
                 let basePower = 0;
 
-                // 如果今天是我们设定需要特殊计算的日期
-                if (todayStr === SPECIAL_DATE) {
-                    // 找 19:00 的数据
-                    let startHourStr = (SPECIAL_START_HOUR < 10 ? '0' : '') + SPECIAL_START_HOUR + ':00';
-                    if (todayData[startHourStr]) {
-                        basePower = todayData[startHourStr].totalPower || 0;
-                    } else {
-                        // 如果 19:00 没有，就在今天的数据里找 19 点之后最早的一条
-                        const availableHours = Object.keys(todayData).sort();
-                        for (let h of availableHours) {
-                            const hr = parseInt(h.split(':')[0]);
-                            if (hr >= SPECIAL_START_HOUR) {
-                                basePower = todayData[h].totalPower || 0;
-                                break;
-                            }
-                        }
+                if (todayData['00:00'] && todayData['00:00'].totalPower) {
+                    basePower = todayData['00:00'].totalPower;
+                } else if (availableHours.length > 0) {
+                    const firstHourStr = availableHours[0];
+                    const hr = parseInt(firstHourStr.split(':')[0]);
+                    if (hr >= 6) {
+                        basePower = todayData[firstHourStr].totalPower || 0;
                     }
-                } else {
-                    // 其他日子正常取 00:00
-                    const zeroData = todayData['00:00'];
-                    basePower = zeroData && zeroData.totalPower ? zeroData.totalPower : 0;
                 }
 
                 const todayTotal = latestTotal - basePower;
