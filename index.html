@@ -9,7 +9,6 @@
         body { margin: 0; padding: 8px; background-color: #f5f5f5; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
         .container { width: 100%; max-width: 900px; }
         
-        /* Tab 样式 */
         .tabs { display: flex; justify-content: center; margin-bottom: 12px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 10px; gap: 10px; }
         .tab-btn { flex: 1; padding: 10px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; color: #666; background: #f0f0f0; cursor: pointer; transition: 0.3s; }
         .tab-btn.active { background: #FF8C42; color: white; box-shadow: 0 2px 6px rgba(255, 140, 66, 0.3); }
@@ -21,6 +20,18 @@
         
         .tab-content { display: none; width: 100%; }
         .tab-content.active { display: block; }
+
+        .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
+        .table-scroll-box::-webkit-scrollbar { display: none; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px; }
+        th, td { padding: 10px 4px; text-align: right; border-bottom: 1px solid #eee; white-space: nowrap; }
+        th { background-color: #fdf2e9; color: #d35400; font-weight: bold; text-align: center; font-size: 12px; position: sticky; top: 0; }
+        th:first-child, td:first-child { padding-left: 8px; padding-right: 8px; text-align: left; color: #666; position: sticky; left: 0; background: white; z-index: 1; box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1); }
+        th:first-child { background: #fdf2e9; z-index: 2; }
+        .val-total { font-weight: bold; color: #333; } 
+        .val-people { font-weight: bold; color: #D81B60; }
+        .up { color: #e74c3c; font-weight: bold; }
+        .down { color: #27ae60; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -32,8 +43,25 @@
             <button class="tab-btn" onclick="switchTab('history')">历史留档</button>
         </div>
 
-        <!-- ================= Tab 1: 实时追踪（新图表：3根线） ================= -->
         <div id="tab-new" class="tab-content active">
+            <div class="card">
+                <h3 style="text-align:center; color:#333; font-size:15px; margin:0 0 10px 0;">最新数据明细</h3>
+                <div class="table-scroll-box">
+                    <table id="liveDataTable">
+                        <thead>
+                            <tr>
+                                <th>时间</th>
+                                <th>总电力值</th>
+                                <th>总电增幅</th>
+                                <th>发电总人数</th>
+                                <th>人数增幅</th>
+                            </tr>
+                        </thead>
+                        <tbody><tr><td colspan="5" style="text-align:center;">数据加载中...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
             <div class="card">
                 <div class="title">总电力值增幅趋势</div>
                 <div class="chart-wrapper" id="chartNewTotalDelta"></div>
@@ -44,26 +72,14 @@
             </div>
         </div>
 
-        <!-- ================= Tab 2: 历史留档（全 11 月灰色实/虚线，不更新） ================= -->
         <div id="tab-history" class="tab-content">
             <div class="card">
                 <div class="title">心动人数（历史留档）</div>
                 <div class="chart-wrapper" id="chartHistHeart"></div>
             </div>
-
             <div class="card">
                 <div class="title">团建电力增幅（历史留档）</div>
                 <div class="chart-wrapper" id="chartHistPower"></div>
-            </div>
-
-            <div class="card">
-                <div class="title">总电力值增幅（历史留档）</div>
-                <div class="chart-wrapper" id="chartHistTotalDelta"></div>
-            </div>
-
-            <div class="card">
-                <div class="title">发电总人数（历史留档）</div>
-                <div class="chart-wrapper" id="chartHistPeople"></div>
             </div>
         </div>
     </div>
@@ -72,16 +88,23 @@
         const CACHE_BUSTER = 'v=' + new Date().getTime();
 
         let globalDataMap = {}; 
+        let globalAllRows = [];
         let allDates = [];
 
         const charts = {
             newTotalDelta: echarts.init(document.getElementById('chartNewTotalDelta')),
             newPeople: echarts.init(document.getElementById('chartNewPeople')),
             histHeart: echarts.init(document.getElementById('chartHistHeart')),
-            histPower: echarts.init(document.getElementById('chartHistPower')),
-            histTotalDelta: echarts.init(document.getElementById('chartHistTotalDelta')),
-            histPeople: echarts.init(document.getElementById('chartHistPeople'))
+            histPower: echarts.init(document.getElementById('chartHistPower'))
         };
+
+        function formatNum(num) { return num === 0 ? '0' : (num ? Number(num).toLocaleString() : '-'); }
+        function formatDelta(num) {
+            if (num === null || num === undefined || num === '' || isNaN(num)) return '-';
+            if (num === 0) return '0';
+            const val = Number(num);
+            return val > 0 ? `<span class="up">+${val.toLocaleString()}</span>` : `<span class="down">${val.toLocaleString()}</span>`;
+        }
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -94,7 +117,6 @@
                 document.querySelectorAll('.tab-btn')[1].classList.add('active');
                 document.getElementById('tab-history').classList.add('active');
             }
-            // 切换时重新计算图表尺寸，防止隐藏状态渲染宽度为 0 的问题
             setTimeout(() => { Object.values(charts).forEach(c => c.resize()); }, 100);
         }
 
@@ -108,16 +130,15 @@
 
         function getSeriesData(date, key) {
             let arr = xAxisHours.map(h => {
+                // 对于增幅类图表，0点保持 0
                 if (h === '00:00') {
-                    if (key === 'heart' || key === 'heartDelta') return 0;
-                    if (key === 'powerDelta' || key === 'totalDelta') return 0;
-                    if (key === 'power') return (globalDataMap[date] && globalDataMap[date]['00:00']) ? globalDataMap[date]['00:00'].power : 0;
-                    if (key === 'totalPower') return (globalDataMap[date] && globalDataMap[date]['00:00']) ? globalDataMap[date]['00:00'].totalPower : 0;
-                    if (key === 'people') return (globalDataMap[date] && globalDataMap[date]['00:00']) ? globalDataMap[date]['00:00'].people : 0;
+                    if (key === 'heartDelta' || key === 'powerDelta' || key === 'totalDelta' || key === 'peopleDelta') return 0;
                 }
                 if (globalDataMap[date] && globalDataMap[date][h] && globalDataMap[date][h][key] !== undefined) return globalDataMap[date][h][key];
                 return null;
             });
+            
+            // 24:00 取次日 0 点数据
             if (arr[24] === null) {
                 const nextDayStr = getNextDateStr(date);
                 if (globalDataMap[nextDayStr] && globalDataMap[nextDayStr]['00:00']) arr[24] = globalDataMap[nextDayStr]['00:00'][key];
@@ -125,7 +146,17 @@
             return arr;
         }
 
-        // 加载数据
+        // 获取某天的总人数增幅（用于图表标注）
+        function getDayPeopleDelta(date) {
+            let sum = 0;
+            if(globalDataMap[date]) {
+                Object.entries(globalDataMap[date]).forEach(([h, v]) => {
+                    if(h !== '00:00' && v.peopleDelta) sum += v.peopleDelta;
+                });
+            }
+            return sum;
+        }
+
         fetch('power_data.csv?' + CACHE_BUSTER)
             .then(res => res.text())
             .then(csv => {
@@ -147,16 +178,22 @@
                     let timeHour = (hour < 10 ? '0' + hour : hour) + ':00';
                     datesSet.add(formattedDate);
 
-                    if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
-                    globalDataMap[formattedDate][timeHour] = {
+                    const rowData = {
+                        rawTime: timeStr,
                         heart: Number(cols[1]) || null, heartDelta: cols[2] !== '' ? Number(cols[2]) : null,
                         power: Number(cols[3]) || null, powerDelta: cols[4] !== '' ? Number(cols[4]) : null,
                         totalPower: Number(cols[5]) || null, totalDelta: cols[6] !== '' ? Number(cols[6]) : null,
                         people: Number(cols[7]) || null, peopleDelta: cols[8] !== '' ? Number(cols[8]) : null
                     };
+                    
+                    globalAllRows.push(rowData);
+                    if (!globalDataMap[formattedDate]) globalDataMap[formattedDate] = {};
+                    globalDataMap[formattedDate][timeHour] = rowData;
                 });
 
                 allDates = Array.from(datesSet).sort().reverse(); 
+
+                renderLiveTable(globalAllRows.slice(-10).reverse());
 
                 if(allDates.length > 0) {
                     renderNewTab(allDates[0]);
@@ -164,30 +201,58 @@
                 }
             });
 
+        function renderLiveTable(latestRows) {
+            const tbody = document.querySelector('#liveDataTable tbody');
+            tbody.innerHTML = '';
+            if (latestRows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">暂无数据</td></tr>';
+                return;
+            }
+            latestRows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>${row.rawTime}</td>
+                    <td class="val-total">${formatNum(row.totalPower)}</td>
+                    <td>${formatDelta(row.totalDelta)}</td>
+                    <td class="val-people">${formatNum(row.people)}</td>
+                    <td>${formatDelta(row.peopleDelta)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
         // ==================== Tab 1: 实时追踪 ====================
         function renderNewTab(selectedDate) {
             const prevDateStr = new Date(new Date(selectedDate).getTime() - 86400000).toISOString().split('T')[0];
-            const shortDate = selectedDate.substring(5), shortPrev = prevDateStr.substring(5);
-
-            // 排除今明两天，找最佳
-            const candidates = Object.keys(globalDataMap).filter(d => d < selectedDate && d !== prevDateStr);
             
-            let bestTotalDeltaDate = null, maxTD = -1;
-            candidates.forEach(d => {
-                let sum = 0;
-                Object.entries(globalDataMap[d]).forEach(([h, v]) => { if(h !== '00:00' && v.totalDelta) sum += v.totalDelta; });
-                if (sum > maxTD) { maxTD = sum; bestTotalDeltaDate = d; }
-            });
+            // 加上每日涨幅总计到图例里
+            const totalDeltaToday = getSeriesData(selectedDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
+            const totalDeltaPrev = getSeriesData(prevDateStr, 'totalDelta').reduce((a,b)=>a+(b||0),0);
+            
+            const peopleToday = getDayPeopleDelta(selectedDate);
+            const peoplePrev = getDayPeopleDelta(prevDateStr);
 
-            let bestPeopleDate = null, maxPpl = -1;
-            candidates.forEach(d => {
-                let ppl = getSeriesData(d, 'people')[24] || 0;
-                if (ppl > maxPpl) { maxPpl = ppl; bestPeopleDate = d; }
-            });
+            const fixedBestDate = "2026-11-04";
+            const bestTotalDelta = getSeriesData(fixedBestDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
+            const bestPeopleDelta = getDayPeopleDelta(fixedBestDate);
 
             const getOption = (series, title) => ({
-                tooltip: { trigger: 'axis', confine: true },
-                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 } },
+                tooltip: { 
+                    trigger: 'axis', confine: true,
+                    formatter: function (params) {
+                        let timeStr = params[0].axisValue;
+                        let html = `<div style="font-weight:bold; margin-bottom:5px;">${timeStr}</div>`;
+                        params.forEach(p => {
+                            if (p.value === null || p.value === undefined) return;
+                            html += `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:3px; font-size:13px;">
+                                        <div style="display:flex; align-items:center;">${p.marker}<span style="margin-left:4px;">${p.seriesName}</span></div>
+                                        <div style="font-weight:bold; margin-left:10px;">${Number(p.value).toLocaleString()}</div>
+                                     </div>`;
+                        });
+                        return html;
+                    }
+                },
+                legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
                 grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 3, fontSize: 10 } },
                 yAxis: { type: 'value', name: title, scale: true, axisLabel: { fontSize: 11 } },
@@ -196,20 +261,20 @@
 
             // 总电增幅
             let seriesTD = [];
-            if (globalDataMap[selectedDate]) seriesTD.push({ name: shortDate, type: 'line', data: getSeriesData(selectedDate, 'totalDelta'), itemStyle: { color: '#FF8C42' }, lineStyle: { width: 2.5 } });
-            if (globalDataMap[prevDateStr]) seriesTD.push({ name: shortPrev, type: 'line', data: getSeriesData(prevDateStr, 'totalDelta'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
-            if (bestTotalDeltaDate) seriesTD.push({ name: bestTotalDeltaDate.substring(5) + ' (最佳)', type: 'line', data: getSeriesData(bestTotalDeltaDate, 'totalDelta'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
+            if (globalDataMap[selectedDate]) seriesTD.push({ name: `${selectedDate.substring(5)} (总计: ${formatNum(totalDeltaToday)})`, type: 'line', data: getSeriesData(selectedDate, 'totalDelta'), itemStyle: { color: '#FF8C42' }, lineStyle: { width: 2.5 } });
+            if (globalDataMap[prevDateStr]) seriesTD.push({ name: `${prevDateStr.substring(5)} (总计: ${formatNum(totalDeltaPrev)})`, type: 'line', data: getSeriesData(prevDateStr, 'totalDelta'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
+            if (globalDataMap[fixedBestDate]) seriesTD.push({ name: `${fixedBestDate.substring(5)} (最佳: ${formatNum(bestTotalDelta)})`, type: 'line', data: getSeriesData(fixedBestDate, 'totalDelta'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
             charts.newTotalDelta.setOption(getOption(seriesTD, '总电增幅'), true);
 
-            // 发电总人数
+            // 发电总人数 (在 name 中标出每日总增)
             let seriesPpl = [];
-            if (globalDataMap[selectedDate]) seriesPpl.push({ name: shortDate, type: 'line', data: getSeriesData(selectedDate, 'people'), itemStyle: { color: '#D81B60' }, lineStyle: { width: 2.5 } });
-            if (globalDataMap[prevDateStr]) seriesPpl.push({ name: shortPrev, type: 'line', data: getSeriesData(prevDateStr, 'people'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
-            if (bestPeopleDate) seriesPpl.push({ name: bestPeopleDate.substring(5) + ' (最佳)', type: 'line', data: getSeriesData(bestPeopleDate, 'people'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
+            if (globalDataMap[selectedDate]) seriesPpl.push({ name: `${selectedDate.substring(5)} (总增: ${formatNum(peopleToday)})`, type: 'line', data: getSeriesData(selectedDate, 'people'), itemStyle: { color: '#D81B60' }, lineStyle: { width: 2.5 } });
+            if (globalDataMap[prevDateStr]) seriesPpl.push({ name: `${prevDateStr.substring(5)} (总增: ${formatNum(peoplePrev)})`, type: 'line', data: getSeriesData(prevDateStr, 'people'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
+            if (globalDataMap[fixedBestDate]) seriesPpl.push({ name: `${fixedBestDate.substring(5)} (最佳: ${formatNum(bestPeopleDelta)})`, type: 'line', data: getSeriesData(fixedBestDate, 'people'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
             charts.newPeople.setOption(getOption(seriesPpl, '发电总人数'), true);
         }
 
-        // ==================== Tab 2: 历史留档（全静态灰线） ====================
+        // ==================== Tab 2: 历史留档 ====================
         function renderHistoryTab() {
             const getOption = (series, title) => ({
                 tooltip: { trigger: 'axis', confine: true },
@@ -220,26 +285,31 @@
                 series: series
             });
 
-            const buildHistorySeries = (key) => {
+            const candidates = Object.keys(globalDataMap).filter(d => d < allDates[0]);
+            let bestHeartDate = null, maxH = -1;
+            let bestPowerDate = null, maxP = -1;
+            candidates.forEach(d => {
+                let hVal = getSeriesData(d, 'heart')[24] || 0;
+                if (hVal > maxH) { maxH = hVal; bestHeartDate = d; }
+                let pVal = 0;
+                Object.entries(globalDataMap[d]).forEach(([h, v]) => { if(h !== '00:00' && v.powerDelta) pVal += v.powerDelta; });
+                if (pVal > maxP) { maxP = pVal; bestPowerDate = d; }
+            });
+
+            const buildHistorySeries = (key, bestDate) => {
                 let series = [];
-                // 遍历所有 11 月的日子，全部做成灰线留档
                 allDates.forEach(d => {
-                    series.push({
-                        name: d.substring(5), 
-                        type: 'line', 
-                        data: getSeriesData(d, key), 
-                        itemStyle: { color: '#B0B0B0' }, 
-                        lineStyle: { width: 1, type: 'solid' }, // 也可以是 'dashed'
-                        symbol: 'none'
-                    });
+                    if (d === bestDate) {
+                        series.push({ name: d.substring(5) + ' (最佳)', type: 'line', data: getSeriesData(d, key), itemStyle: { color: '#FF8C42' }, lineStyle: { width: 2.5 }, symbol: 'circle', symbolSize: 4 });
+                    } else {
+                        series.push({ name: d.substring(5), type: 'line', data: getSeriesData(d, key), itemStyle: { color: '#B0B0B0' }, lineStyle: { width: 1, type: 'solid' }, symbol: 'none' });
+                    }
                 });
                 return series;
             };
 
-            charts.histHeart.setOption(getOption(buildHistorySeries('heart'), '心动人数'), true);
-            charts.histPower.setOption(getOption(buildHistorySeries('powerDelta'), '团建电力增幅'), true);
-            charts.histTotalDelta.setOption(getOption(buildHistorySeries('totalDelta'), '总电增幅'), true);
-            charts.histPeople.setOption(getOption(buildHistorySeries('people'), '发电总人数'), true);
+            charts.histHeart.setOption(getOption(buildHistorySeries('heart', bestHeartDate), '心动人数'), true);
+            charts.histPower.setOption(getOption(buildHistorySeries('powerDelta', bestPowerDate), '团建电力增幅'), true);
         }
 
         window.addEventListener('resize', function() { 
