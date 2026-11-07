@@ -58,9 +58,8 @@
             <span class="title-text">数据追踪系统</span>
             <div class="hover-box" id="goalHoverBox">
                 <div class="hover-title">总目标增幅 2.2亿</div>
-                <!-- 顺序修改：目前发电增幅在第一行 -->
                 <div class="hover-row"><span>目前发电增幅：</span><span class="hover-val" id="hoverCurrentIncrease">计算中...</span></div>
-                <div class="hover-row"><span>初始总电力：</span><span class="hover-val">771,507,163</span></div>
+                <div class="hover-row"><span>初始总电力：</span><span class="hover-val" id="hoverInitPower">763,797,264</span></div>
                 <div class="hover-row"><span>今日发电总值：</span><span class="hover-val" id="hoverTodayTotal">计算中...</span></div>
                 <div class="hover-row"><span>发电总值：</span><span class="hover-val" id="hoverLatestTotal">计算中...</span></div>
             </div>
@@ -114,7 +113,8 @@
 
     <script>
         const CACHE_BUSTER = 'v=' + new Date().getTime();
-        const INITIAL_TOTAL_POWER = 771507163;
+        // 【更新】初始总电力修改为 763,797,264
+        const INITIAL_TOTAL_POWER = 763797264; 
 
         let globalDataMap = {}; 
         let globalAllRows = [];
@@ -191,6 +191,7 @@
 
             document.getElementById('hoverLatestTotal').innerText = formatNum(latestTotal);
 
+            // 目前发电增幅 = 最新总电力 - 初始总电力(763,797,264)
             const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
             document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
 
