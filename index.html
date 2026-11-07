@@ -9,19 +9,17 @@
         body { margin: 0; padding: 8px; background-color: #f5f5f5; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
         .container { width: 100%; max-width: 900px; }
         
-        /* 顶部标题悬浮样式 */
-        .page-header { text-align: center; position: relative; margin-bottom: 15px; margin-top: 10px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
-        .title-text { color: #D35400; font-size: 20px; font-weight: bold; border-bottom: 1px dashed #D35400; padding-bottom: 2px; }
-        
+        /* 标题 */
+        .page-header { text-align: center; color: #D35400; font-size: 20px; font-weight: bold; margin-bottom: 10px; margin-top: 10px; }
+
+        /* 固定显示的数据面板 */
         .hover-box { 
-            display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); 
             background: rgba(255, 255, 255, 0.98); border: 1px solid #FFB27A; border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.15); padding: 15px; z-index: 100; width: 260px; text-align: left;
-            margin-top: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); padding: 15px; width: 100%; max-width: 350px; 
+            margin: 0 auto 15px auto; text-align: left; box-sizing: border-box;
         }
-        .page-header:hover .hover-box { display: block; }
-        .hover-title { font-size: 16px; font-weight: bold; color: #D35400; margin-bottom: 8px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-        .hover-row { font-size: 12px; color: #555; display: flex; justify-content: space-between; margin-bottom: 6px; }
+        .hover-title { font-size: 15px; font-weight: bold; color: #D35400; margin-bottom: 10px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        .hover-row { font-size: 13px; color: #555; display: flex; justify-content: space-between; margin-bottom: 8px; }
         .hover-row:last-child { margin-bottom: 0; }
         .hover-val { font-weight: bold; color: #333; }
 
@@ -53,16 +51,14 @@
 <body>
     <div class="container">
         
-        <!-- 标题与悬浮框 -->
-        <div class="page-header">
-            <span class="title-text">数据追踪系统</span>
-            <div class="hover-box" id="goalHoverBox">
-                <div class="hover-title">总目标增幅 2.2亿</div>
-                <div class="hover-row"><span>目前发电增幅：</span><span class="hover-val" id="hoverCurrentIncrease">计算中...</span></div>
-                <div class="hover-row"><span>初始总电力：</span><span class="hover-val" id="hoverInitPower">763,797,264</span></div>
-                <div class="hover-row"><span>今日发电总值：</span><span class="hover-val" id="hoverTodayTotal">计算中...</span></div>
-                <div class="hover-row"><span>发电总值：</span><span class="hover-val" id="hoverLatestTotal">计算中...</span></div>
-            </div>
+        <div class="page-header">数据追踪系统</div>
+        
+        <div class="hover-box" id="goalHoverBox">
+            <div class="hover-title">总目标增幅 2.2亿</div>
+            <div class="hover-row"><span>目前发电增幅：</span><span class="hover-val" id="hoverCurrentIncrease">计算中...</span></div>
+            <div class="hover-row"><span>初始总电力：</span><span class="hover-val">763,797,264</span></div>
+            <div class="hover-row"><span>今日发电总值：</span><span class="hover-val" id="hoverTodayTotal">计算中...</span></div>
+            <div class="hover-row"><span>发电总值：</span><span class="hover-val" id="hoverLatestTotal">计算中...</span></div>
         </div>
 
         <div class="tabs">
@@ -113,8 +109,10 @@
 
     <script>
         const CACHE_BUSTER = 'v=' + new Date().getTime();
-        // 【更新】初始总电力修改为 763,797,264
         const INITIAL_TOTAL_POWER = 763797264; 
+        // 设定今天特殊计算的开始时间（因为是晚 19 点开始）
+        const SPECIAL_DATE = "2026-11-07";
+        const SPECIAL_START_HOUR = 19;
 
         let globalDataMap = {}; 
         let globalAllRows = [];
@@ -182,7 +180,7 @@
             return sum;
         }
 
-        // 更新顶部悬浮框数据
+        // 更新顶部面板（加入 11月7日 特殊计算逻辑）
         function updateHoverData() {
             if(globalAllRows.length === 0) return;
 
@@ -191,16 +189,39 @@
 
             document.getElementById('hoverLatestTotal').innerText = formatNum(latestTotal);
 
-            // 目前发电增幅 = 最新总电力 - 初始总电力(763,797,264)
             const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
             document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
 
             const todayStr = latestRow.rawTime.split(' ')[0].replace(/\//g, '-');
             const todayData = globalDataMap[todayStr];
+            
             if (todayData) {
-                const zeroData = todayData['00:00'];
-                const todayZeroPower = zeroData && zeroData.totalPower ? zeroData.totalPower : 0;
-                const todayTotal = latestTotal - todayZeroPower;
+                let basePower = 0;
+
+                // 如果今天是我们设定需要特殊计算的日期
+                if (todayStr === SPECIAL_DATE) {
+                    // 找 19:00 的数据
+                    let startHourStr = (SPECIAL_START_HOUR < 10 ? '0' : '') + SPECIAL_START_HOUR + ':00';
+                    if (todayData[startHourStr]) {
+                        basePower = todayData[startHourStr].totalPower || 0;
+                    } else {
+                        // 如果 19:00 没有，就在今天的数据里找 19 点之后最早的一条
+                        const availableHours = Object.keys(todayData).sort();
+                        for (let h of availableHours) {
+                            const hr = parseInt(h.split(':')[0]);
+                            if (hr >= SPECIAL_START_HOUR) {
+                                basePower = todayData[h].totalPower || 0;
+                                break;
+                            }
+                        }
+                    }
+                } else {
+                    // 其他日子正常取 00:00
+                    const zeroData = todayData['00:00'];
+                    basePower = zeroData && zeroData.totalPower ? zeroData.totalPower : 0;
+                }
+
+                const todayTotal = latestTotal - basePower;
                 document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotal);
             } else {
                 document.getElementById('hoverTodayTotal').innerText = '-';
