@@ -58,8 +58,9 @@
             <span class="title-text">数据追踪系统</span>
             <div class="hover-box" id="goalHoverBox">
                 <div class="hover-title">总目标增幅 2.2亿</div>
-                <div class="hover-row"><span>初始总电力：</span><span class="hover-val">771,507,163</span></div>
+                <!-- 顺序修改：目前发电增幅在第一行 -->
                 <div class="hover-row"><span>目前发电增幅：</span><span class="hover-val" id="hoverCurrentIncrease">计算中...</span></div>
+                <div class="hover-row"><span>初始总电力：</span><span class="hover-val">771,507,163</span></div>
                 <div class="hover-row"><span>今日发电总值：</span><span class="hover-val" id="hoverTodayTotal">计算中...</span></div>
                 <div class="hover-row"><span>发电总值：</span><span class="hover-val" id="hoverLatestTotal">计算中...</span></div>
             </div>
@@ -185,18 +186,14 @@
         function updateHoverData() {
             if(globalAllRows.length === 0) return;
 
-            // 获取最新一条数据
             const latestRow = globalAllRows[globalAllRows.length - 1];
             const latestTotal = latestRow.totalPower || 0;
 
-            // 1. 发电总值（最新数据）
             document.getElementById('hoverLatestTotal').innerText = formatNum(latestTotal);
 
-            // 2. 目前发电增幅 = 最新总电力 - 初始总电力
             const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
             document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
 
-            // 3. 今日发电总值 = 今天的总电力 - 今天 0 点的总电力
             const todayStr = latestRow.rawTime.split(' ')[0].replace(/\//g, '-');
             const todayData = globalDataMap[todayStr];
             if (todayData) {
@@ -246,7 +243,7 @@
                 allDates = Array.from(datesSet).sort().reverse(); 
 
                 renderLiveTable(globalAllRows.slice(-10).reverse());
-                updateHoverData(); // 加载完成后更新悬浮框
+                updateHoverData();
 
                 if(allDates.length > 0) {
                     renderNewTab(allDates[0]);
