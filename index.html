@@ -40,7 +40,7 @@
         .tab-btn.active { background: #FF8C42; color: white; box-shadow: 0 2px 6px rgba(255, 140, 66, 0.3); }
         
         .card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 12px; padding: 12px 0; overflow: hidden; }
-        .chart-wrapper { width: 100%; height: 320px; }
+        .chart-wrapper { width: 100%; height: 350px; }
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; }
         
         .tab-content { display: none; width: 100%; }
@@ -59,7 +59,6 @@
         .table-scroll-box::-webkit-scrollbar-thumb { background: #ffd8b8; border-radius: 4px; }
         .table-scroll-box::-webkit-scrollbar-track { background: transparent; }
 
-        /* 移除了 100% 宽度，改为 auto 并铺满，防止强行拉伸 */
         table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px; }
         
         th { 
@@ -73,12 +72,11 @@
             white-space: nowrap; transition: background 0.2s;
         }
         
-        /* 减少第一列的内边距，防止太宽 */
         th:first-child, td:first-child { 
             padding-left: 10px; padding-right: 5px; text-align: left; color: #888; font-size: 12px;
             position: sticky; left: 0; background: white; z-index: 5;
             box-shadow: 2px 0 5px -2px rgba(0,0,0,0.05);
-            width: 100px; /* 限制时间列的宽度 */
+            width: 100px;
         }
         th:first-child { background: #fdf2e9; z-index: 15; color: #d35400; text-align: center;}
 
@@ -86,7 +84,6 @@
         tbody tr:nth-child(even) td:first-child { background-color: #fafafa; }
         tbody tr:hover td { background-color: #fff8f3 !important; }
 
-        /* 数字稍微居中，防止留白过大 */
         .val-total, .val-people, .up, .down { 
             font-weight: bold; font-family: monospace; font-size: 13.5px; 
             text-align: right;
@@ -149,10 +146,7 @@
                 <div class="title">总电力值增幅趋势</div>
                 <div class="chart-wrapper" id="chartNewTotalDelta"></div>
             </div>
-            <div class="card">
-                <div class="title">发电总人数趋势</div>
-                <div class="chart-wrapper" id="chartNewPeople"></div>
-            </div>
+            
         </div>
 
         <div id="tab-history" class="tab-content">
@@ -176,9 +170,9 @@
         let globalAllRows = [];
         let allDates = [];
 
+        // 移除了发电总人数的图表实例
         const charts = {
             newTotalDelta: echarts.init(document.getElementById('chartNewTotalDelta')),
-            newPeople: echarts.init(document.getElementById('chartNewPeople')),
             histHeart: echarts.init(document.getElementById('chartHistHeart')),
             histPower: echarts.init(document.getElementById('chartHistPower'))
         };
@@ -226,16 +220,6 @@
                 if (globalDataMap[nextDayStr] && globalDataMap[nextDayStr]['00:00']) arr[24] = globalDataMap[nextDayStr]['00:00'][key];
             }
             return arr;
-        }
-
-        function getDayPeopleDelta(date) {
-            let sum = 0;
-            if(globalDataMap[date]) {
-                Object.entries(globalDataMap[date]).forEach(([h, v]) => {
-                    if(h !== '00:00' && v.peopleDelta) sum += v.peopleDelta;
-                });
-            }
-            return sum;
         }
 
         function updateHoverData() {
@@ -331,12 +315,8 @@
             const totalDeltaToday = getSeriesData(selectedDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
             const totalDeltaPrev = getSeriesData(prevDateStr, 'totalDelta').reduce((a,b)=>a+(b||0),0);
             
-            const peopleToday = getDayPeopleDelta(selectedDate);
-            const peoplePrev = getDayPeopleDelta(prevDateStr);
-
             const fixedBestDate = "2026-11-04";
             const bestTotalDelta = getSeriesData(fixedBestDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
-            const bestPeopleDelta = getDayPeopleDelta(fixedBestDate);
 
             const getOption = (series, title) => ({
                 tooltip: { 
@@ -365,13 +345,9 @@
             if (globalDataMap[selectedDate]) seriesTD.push({ name: `${selectedDate.substring(5)} (总计: ${formatNum(totalDeltaToday)})`, type: 'line', data: getSeriesData(selectedDate, 'totalDelta'), itemStyle: { color: '#FF8C42' }, lineStyle: { width: 2.5 } });
             if (globalDataMap[prevDateStr]) seriesTD.push({ name: `${prevDateStr.substring(5)} (总计: ${formatNum(totalDeltaPrev)})`, type: 'line', data: getSeriesData(prevDateStr, 'totalDelta'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
             if (globalDataMap[fixedBestDate]) seriesTD.push({ name: `${fixedBestDate.substring(5)} (最佳: ${formatNum(bestTotalDelta)})`, type: 'line', data: getSeriesData(fixedBestDate, 'totalDelta'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
+            
+            // 只渲染总电增幅
             charts.newTotalDelta.setOption(getOption(seriesTD, '总电增幅'), true);
-
-            let seriesPpl = [];
-            if (globalDataMap[selectedDate]) seriesPpl.push({ name: `${selectedDate.substring(5)} (总增: ${formatNum(peopleToday)})`, type: 'line', data: getSeriesData(selectedDate, 'people'), itemStyle: { color: '#D81B60' }, lineStyle: { width: 2.5 } });
-            if (globalDataMap[prevDateStr]) seriesPpl.push({ name: `${prevDateStr.substring(5)} (总增: ${formatNum(peoplePrev)})`, type: 'line', data: getSeriesData(prevDateStr, 'people'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
-            if (globalDataMap[fixedBestDate]) seriesPpl.push({ name: `${fixedBestDate.substring(5)} (最佳: ${formatNum(bestPeopleDelta)})`, type: 'line', data: getSeriesData(fixedBestDate, 'people'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
-            charts.newPeople.setOption(getOption(seriesPpl, '发电总人数'), true);
         }
 
         function renderHistoryTab() {
