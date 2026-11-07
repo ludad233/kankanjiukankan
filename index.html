@@ -33,6 +33,9 @@
         .hover-row:last-child { margin-bottom: 0; }
         .hover-val { font-weight: bold; color: #333; text-align: right; line-height: 1.2; }
         .hover-sub { font-size: 11px; color: #888; font-weight: normal; margin-top: 2px; display: block; }
+        
+        /* 标红数字的样式 */
+        .text-red { color: #e74c3c; font-weight: bold; }
 
         /* Tab 样式 */
         .tabs { display: flex; justify-content: center; margin-bottom: 12px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 10px; gap: 10px; }
@@ -46,7 +49,7 @@
         .tab-content { display: none; width: 100%; }
         .tab-content.active { display: block; }
 
-        /* ================= 优化间距的表格 ================= */
+        /* ================= 优化后的表格 ================= */
         .table-card { padding: 0; } 
         .table-header-title { 
             text-align: center; color: #D35400; font-size: 15px; font-weight: bold; 
@@ -59,34 +62,32 @@
         .table-scroll-box::-webkit-scrollbar-thumb { background: #ffd8b8; border-radius: 4px; }
         .table-scroll-box::-webkit-scrollbar-track { background: transparent; }
 
-        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; table-layout: fixed; }
         
         th { 
             background-color: #fdf2e9; color: #d35400; font-weight: bold; 
-            text-align: center; font-size: 12px; padding: 12px 4px; 
+            text-align: left; font-size: 12px; padding: 12px 10px; 
             position: sticky; top: 0; z-index: 10; white-space: nowrap;
         }
         
         td { 
-            padding: 14px 4px; text-align: right; border-bottom: 1px solid #f5f5f5; 
+            padding: 14px 10px; text-align: left; border-bottom: 1px solid #f5f5f5; 
             white-space: nowrap; transition: background 0.2s;
         }
         
         th:first-child, td:first-child { 
-            padding-left: 10px; padding-right: 5px; text-align: left; color: #888; font-size: 12px;
+            width: 22%; color: #888; font-size: 12px; 
             position: sticky; left: 0; background: white; z-index: 5;
             box-shadow: 2px 0 5px -2px rgba(0,0,0,0.05);
-            width: 100px;
         }
-        th:first-child { background: #fdf2e9; z-index: 15; color: #d35400; text-align: center;}
+        th:first-child { background: #fdf2e9; z-index: 15; color: #d35400; }
 
         tbody tr:nth-child(even) td { background-color: #fafafa; }
         tbody tr:nth-child(even) td:first-child { background-color: #fafafa; }
         tbody tr:hover td { background-color: #fff8f3 !important; }
 
         .val-total, .val-people, .up, .down { 
-            font-weight: bold; font-family: monospace; font-size: 13.5px; 
-            text-align: right;
+            font-weight: bold; font-family: 'Courier New', Courier, monospace; font-size: 14px; 
         } 
         .val-total { color: #333; } 
         .val-people { color: #D81B60; }
@@ -170,7 +171,6 @@
         let globalAllRows = [];
         let allDates = [];
 
-        // 移除了发电总人数的图表实例
         const charts = {
             newTotalDelta: echarts.init(document.getElementById('chartNewTotalDelta')),
             histHeart: echarts.init(document.getElementById('chartHistHeart')),
@@ -233,11 +233,12 @@
             const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
             document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
 
+            // 这里将数字包在 span.text-red 中实现标红
             if (currentIncrease < TARGET_INCREASE) {
                 const remain = TARGET_INCREASE - currentIncrease;
-                document.getElementById('hoverRemainDiff').innerText = `(距2.2亿还差 ${formatNum(remain)})`;
+                document.getElementById('hoverRemainDiff').innerHTML = `(距2.2亿还差 <span class="text-red">${formatNum(remain)}</span>)`;
             } else {
-                document.getElementById('hoverRemainDiff').innerText = `(已达标)`;
+                document.getElementById('hoverRemainDiff').innerHTML = `(已达标)`;
             }
 
             const todayTotal = latestTotal - INITIAL_TOTAL_POWER;
@@ -346,7 +347,6 @@
             if (globalDataMap[prevDateStr]) seriesTD.push({ name: `${prevDateStr.substring(5)} (总计: ${formatNum(totalDeltaPrev)})`, type: 'line', data: getSeriesData(prevDateStr, 'totalDelta'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
             if (globalDataMap[fixedBestDate]) seriesTD.push({ name: `${fixedBestDate.substring(5)} (最佳: ${formatNum(bestTotalDelta)})`, type: 'line', data: getSeriesData(fixedBestDate, 'totalDelta'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
             
-            // 只渲染总电增幅
             charts.newTotalDelta.setOption(getOption(seriesTD, '总电增幅'), true);
         }
 
