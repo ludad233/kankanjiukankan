@@ -29,7 +29,7 @@
         }
 
         .hover-title { 
-            font-size: 18px; /* 与上方字号一致 */
+            font-size: 18px; 
             font-weight: bold; 
             color: #D35400; 
             margin-bottom: 12px; 
@@ -55,17 +55,47 @@
         .tab-content { display: none; width: 100%; }
         .tab-content.active { display: block; }
 
-        .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
-        .table-scroll-box::-webkit-scrollbar { display: none; }
-        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 500px; }
-        th, td { padding: 10px 4px; text-align: right; border-bottom: 1px solid #eee; white-space: nowrap; }
-        th { background-color: #fdf2e9; color: #d35400; font-weight: bold; text-align: center; font-size: 12px; position: sticky; top: 0; }
-        th:first-child, td:first-child { padding-left: 8px; padding-right: 8px; text-align: left; color: #666; position: sticky; left: 0; background: white; z-index: 1; box-shadow: 2px 0 5px -2px rgba(0,0,0,0.1); }
-        th:first-child { background: #fdf2e9; z-index: 2; }
-        .val-total { font-weight: bold; color: #333; } 
-        .val-people { font-weight: bold; color: #D81B60; }
-        .up { color: #e74c3c; font-weight: bold; }
-        .down { color: #27ae60; font-weight: bold; }
+        /* ================= 优化后的表格样式 ================= */
+        .table-card { padding: 0; } 
+        .table-header-title { 
+            text-align: center; color: #D35400; font-size: 15px; font-weight: bold; 
+            padding: 15px 0; margin: 0; background: #fffaf6; border-bottom: 1px solid #fdf2e9;
+        }
+        
+        .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        
+        .table-scroll-box::-webkit-scrollbar { height: 6px; }
+        .table-scroll-box::-webkit-scrollbar-thumb { background: #ffd8b8; border-radius: 4px; }
+        .table-scroll-box::-webkit-scrollbar-track { background: transparent; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 550px; }
+        
+        th { 
+            background-color: #fdf2e9; color: #d35400; font-weight: bold; 
+            text-align: center; font-size: 12px; padding: 12px 8px; 
+            position: sticky; top: 0; z-index: 10; white-space: nowrap;
+        }
+        
+        td { 
+            padding: 14px 8px; text-align: right; border-bottom: 1px solid #f5f5f5; 
+            white-space: nowrap; transition: background 0.2s;
+        }
+        
+        th:first-child, td:first-child { 
+            padding-left: 15px; text-align: left; color: #888; font-size: 12px;
+            position: sticky; left: 0; background: white; z-index: 5;
+            box-shadow: 2px 0 5px -2px rgba(0,0,0,0.05);
+        }
+        th:first-child { background: #fdf2e9; z-index: 15; color: #d35400; }
+
+        tbody tr:nth-child(even) td { background-color: #fafafa; }
+        tbody tr:nth-child(even) td:first-child { background-color: #fafafa; }
+        tbody tr:hover td { background-color: #fff8f3 !important; }
+
+        .val-total { font-weight: bold; color: #333; font-family: monospace; font-size: 14px; } 
+        .val-people { font-weight: bold; color: #D81B60; font-family: monospace; font-size: 14px; }
+        .up { color: #e74c3c; font-weight: bold; font-family: monospace; }
+        .down { color: #27ae60; font-weight: bold; font-family: monospace; }
     </style>
 </head>
 <body>
@@ -74,12 +104,10 @@
         <div class="page-header">数据追踪系统</div>
         
         <div class="hover-box" id="goalHoverBox">
-            <!-- 移上来的发电总值，粉色大字 -->
             <div class="top-total">
                 发电总值：<span id="hoverLatestTotal">计算中...</span>
             </div>
             
-            <!-- 总目标增幅 -->
             <div class="hover-title">总目标增幅 2.2亿</div>
             
             <div class="hover-row">
@@ -99,8 +127,9 @@
         </div>
 
         <div id="tab-new" class="tab-content active">
-            <div class="card">
-                <h3 style="text-align:center; color:#333; font-size:15px; margin:0 0 10px 0;">最新数据明细</h3>
+            
+            <div class="card table-card">
+                <h3 class="table-header-title">最新数据明细</h3>
                 <div class="table-scroll-box">
                     <table id="liveDataTable">
                         <thead>
@@ -142,7 +171,7 @@
     <script>
         const CACHE_BUSTER = 'v=' + new Date().getTime();
         const INITIAL_TOTAL_POWER = 763797264; 
-        const TARGET_INCREASE = 220000000; // 目标增幅 2.2 亿
+        const TARGET_INCREASE = 220000000; 
 
         let globalDataMap = {}; 
         let globalAllRows = [];
@@ -222,7 +251,7 @@
             const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
             document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
 
-            // 计算距离目标还差多少
+            // 目标差距
             if (currentIncrease < TARGET_INCREASE) {
                 const remain = TARGET_INCREASE - currentIncrease;
                 document.getElementById('hoverRemainDiff').innerText = `(距2.2亿还差 ${formatNum(remain)})`;
@@ -230,28 +259,9 @@
                 document.getElementById('hoverRemainDiff').innerText = `(已达标)`;
             }
 
-            const todayStr = latestRow.rawTime.split(' ')[0].replace(/\//g, '-');
-            const todayData = globalDataMap[todayStr];
-            
-            if (todayData) {
-                const availableHours = Object.keys(todayData).sort();
-                let basePower = 0;
-
-                if (todayData['00:00'] && todayData['00:00'].totalPower) {
-                    basePower = todayData['00:00'].totalPower;
-                } else if (availableHours.length > 0) {
-                    const firstHourStr = availableHours[0];
-                    const hr = parseInt(firstHourStr.split(':')[0]);
-                    if (hr >= 6) {
-                        basePower = todayData[firstHourStr].totalPower || 0;
-                    }
-                }
-
-                const todayTotal = latestTotal - basePower;
-                document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotal);
-            } else {
-                document.getElementById('hoverTodayTotal').innerText = '-';
-            }
+            // 【修改点】：今日发电总值 = 当前总值 - 初始总电力
+            const todayTotal = latestTotal - INITIAL_TOTAL_POWER;
+            document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotal);
         }
 
         fetch('power_data.csv?' + CACHE_BUSTER)
@@ -303,7 +313,7 @@
             const tbody = document.querySelector('#liveDataTable tbody');
             tbody.innerHTML = '';
             if (latestRows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;">暂无数据</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999; padding:20px;">暂无数据</td></tr>';
                 return;
             }
             latestRows.forEach(row => {
