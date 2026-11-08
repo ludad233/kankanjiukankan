@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>数据追踪系统</title>
+    <title>电力值数据追踪</title>
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
     <style>
         body { margin: 0; padding: 8px; background-color: #f5f5f5; font-family: -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
@@ -98,7 +98,8 @@
 <body>
     <div class="container">
         
-        <div class="page-header">数据追踪系统</div>
+        <!-- 修改标题 -->
+        <div class="page-header">电力值数据追踪</div>
         
         <div class="hover-box" id="goalHoverBox">
             <div class="top-total">
@@ -233,7 +234,6 @@
             const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
             document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
 
-            // 这里将数字包在 span.text-red 中实现标红
             if (currentIncrease < TARGET_INCREASE) {
                 const remain = TARGET_INCREASE - currentIncrease;
                 document.getElementById('hoverRemainDiff').innerHTML = `(距2.2亿还差 <span class="text-red">${formatNum(remain)}</span>)`;
@@ -241,7 +241,18 @@
                 document.getElementById('hoverRemainDiff').innerHTML = `(已达标)`;
             }
 
-            const todayTotal = latestTotal - INITIAL_TOTAL_POWER;
+            // 今日发电总值 = 今天的累计增幅（剔除 00:00 的增幅）
+            const todayStr = latestRow.rawTime.split(' ')[0].replace(/\//g, '-');
+            const todayData = globalDataMap[todayStr];
+            let todayTotal = 0;
+            
+            if (todayData) {
+                Object.entries(todayData).forEach(([h, v]) => {
+                    if (h !== '00:00' && v.totalDelta) {
+                        todayTotal += v.totalDelta;
+                    }
+                });
+            }
             document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotal);
         }
 
