@@ -241,17 +241,21 @@
                 document.getElementById('hoverRemainDiff').innerHTML = `(已达标)`;
             }
 
-            // 今日发电总值 = 今天的累计增幅（剔除 00:00 的增幅）
+            // 【修复逻辑】：今日发电总值 = 当前总值 - 今天 0 点的总值
             const todayStr = latestRow.rawTime.split(' ')[0].replace(/\//g, '-');
             const todayData = globalDataMap[todayStr];
             let todayTotal = 0;
             
             if (todayData) {
-                Object.entries(todayData).forEach(([h, v]) => {
-                    if (h !== '00:00' && v.totalDelta) {
-                        todayTotal += v.totalDelta;
-                    }
-                });
+                // 如果有今天的 0 点数据，直接相减
+                if (todayData['00:00'] && todayData['00:00'].totalPower) {
+                    todayTotal = latestTotal - todayData['00:00'].totalPower;
+                } else {
+                    // 兜底：如果今天没抓到 0 点的数据，就累加所有非 0 点的增幅
+                    Object.entries(todayData).forEach(([h, v]) => {
+                        if (h !== '00:00' && v.totalDelta) todayTotal += v.totalDelta;
+                    });
+                }
             }
             document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotal);
         }
