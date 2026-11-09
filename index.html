@@ -19,21 +19,12 @@
             margin: 0 auto 15px auto; text-align: left; box-sizing: border-box;
         }
         
-        .top-total { 
-            font-size: 18px; font-weight: bold; color: #FF69B4; text-align: center; margin-bottom: 5px; 
-        }
-
-        .hover-title { 
-            font-size: 18px; font-weight: bold; color: #D35400; 
-            margin-bottom: 12px; text-align: center; 
-            border-bottom: 1px solid #eee; padding-bottom: 10px; 
-        }
-
+        .top-total { font-size: 18px; font-weight: bold; color: #FF69B4; text-align: center; margin-bottom: 5px; }
+        .hover-title { font-size: 18px; font-weight: bold; color: #D35400; margin-bottom: 12px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
         .hover-row { font-size: 13px; color: #555; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
         .hover-row:last-child { margin-bottom: 0; }
         .hover-val { font-weight: bold; color: #333; text-align: right; line-height: 1.2; }
         .hover-sub { font-size: 11px; color: #888; font-weight: normal; margin-top: 2px; display: block; }
-        
         .text-red { color: #e74c3c; font-weight: bold; }
 
         /* Tab 样式 */
@@ -42,11 +33,10 @@
         .tab-btn.active { background: #FF8C42; color: white; box-shadow: 0 2px 6px rgba(255, 140, 66, 0.3); }
         
         .card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 12px; padding: 12px 0; overflow: hidden; }
-        .chart-wrapper { width: 100%; height: 380px; } /* 稍微增加了高度，给胶囊留空间 */
-        
+        .chart-wrapper { width: 100%; height: 380px; }
         .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 5px 0; }
         
-        /* 新增：胶囊对比标签 */
+        /* 胶囊对比标签 */
         .diff-badge {
             text-align: center; font-size: 12px; font-weight: bold; 
             background: #FFF5F5; border: 1px dashed #e74c3c; color: #333;
@@ -59,11 +49,7 @@
 
         /* 表格样式 */
         .table-card { padding: 0; } 
-        .table-header-title { 
-            text-align: center; color: #D35400; font-size: 15px; font-weight: bold; 
-            padding: 15px 0; margin: 0; background: #fffaf6; border-bottom: 1px solid #fdf2e9;
-        }
-        
+        .table-header-title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; padding: 15px 0; margin: 0; background: #fffaf6; border-bottom: 1px solid #fdf2e9; }
         .table-scroll-box { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .table-scroll-box::-webkit-scrollbar { height: 6px; }
         .table-scroll-box::-webkit-scrollbar-thumb { background: #ffd8b8; border-radius: 4px; }
@@ -136,7 +122,6 @@
 
             <div class="card">
                 <div class="title">总电力值增幅趋势</div>
-                <!-- 新增胶囊对比标签 -->
                 <div class="diff-badge" id="compareBadge">计算中...</div>
                 <div class="chart-wrapper" id="chartNewTotalDelta"></div>
             </div>
@@ -216,7 +201,7 @@
             return arr;
         }
 
-        // 获取最近一次有数据的小时，用于截取“同时段”
+        // 获取今天最后有数据的小时
         function getLastHourToday() {
             if (globalAllRows.length === 0) return 0;
             const latestRow = globalAllRows[globalAllRows.length - 1];
@@ -246,7 +231,7 @@
             document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotalDeltaGlobal);
         }
 
-        // 更新胶囊对比标签
+        // 【核心修复】：计算胶囊对比标签
         function updateCompareBadge() {
             if (allDates.length === 0) return;
             const todayStr = allDates[0];
@@ -257,10 +242,11 @@
                 return;
             }
 
-            // 截取昨天的同时段（基于今天最新的小时数）
             const lastHour = getLastHourToday();
             let prevDeltaAtCur = 0;
-            for(let i=0; i <= lastHour; i++) {
+            
+            // 昨天同时段，也必须从 01:00 开始算（跳过 0 点），避免昨天跨天的巨大增幅干扰
+            for(let i=1; i <= lastHour; i++) {
                 let hStr = (i < 10 ? '0'+i : i) + ':00';
                 if (globalDataMap[prevDateStr][hStr] && globalDataMap[prevDateStr][hStr].totalDelta) {
                     prevDeltaAtCur += globalDataMap[prevDateStr][hStr].totalDelta;
@@ -318,7 +304,7 @@
                     
                     renderLiveTable(globalAllRows.slice(-10).reverse());
                     updateHoverData();
-                    updateCompareBadge();
+                    updateCompareBadge(); // 更新对比
                     renderNewTab(allDates[0]);
                     renderHistoryTab();
                 }
