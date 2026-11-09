@@ -34,7 +34,6 @@
         .hover-val { font-weight: bold; color: #333; text-align: right; line-height: 1.2; }
         .hover-sub { font-size: 11px; color: #888; font-weight: normal; margin-top: 2px; display: block; }
         
-        /* 标红数字的样式 */
         .text-red { color: #e74c3c; font-weight: bold; }
 
         /* Tab 样式 */
@@ -49,7 +48,7 @@
         .tab-content { display: none; width: 100%; }
         .tab-content.active { display: block; }
 
-        /* ================= 优化后的表格 ================= */
+        /* 表格样式 */
         .table-card { padding: 0; } 
         .table-header-title { 
             text-align: center; color: #D35400; font-size: 15px; font-weight: bold; 
@@ -170,7 +169,7 @@
         let globalDataMap = {}; 
         let globalAllRows = [];
         let allDates = [];
-        let todayTotalDeltaGlobal = 0; // 全局存一份今天总增幅
+        let todayTotalDeltaGlobal = 0; 
 
         const charts = {
             newTotalDelta: echarts.init(document.getElementById('chartNewTotalDelta')),
@@ -241,7 +240,6 @@
                 document.getElementById('hoverRemainDiff').innerHTML = `(已达标)`;
             }
 
-            // 【核心修复】：直接使用图表里计算出的今日总增幅！
             document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotalDeltaGlobal);
         }
 
@@ -282,7 +280,6 @@
                 allDates = Array.from(datesSet).sort().reverse(); 
 
                 if(allDates.length > 0) {
-                    // 提前算好今天的总增幅
                     todayTotalDeltaGlobal = getSeriesData(allDates[0], 'totalDelta').reduce((a,b)=>a+(b||0),0);
                     
                     renderLiveTable(globalAllRows.slice(-10).reverse());
@@ -315,7 +312,7 @@
         function renderNewTab(selectedDate) {
             const prevDateStr = new Date(new Date(selectedDate).getTime() - 86400000).toISOString().split('T')[0];
             
-            const totalDeltaToday = todayTotalDeltaGlobal; // 直接使用算好的
+            const totalDeltaToday = todayTotalDeltaGlobal; 
             const totalDeltaPrev = getSeriesData(prevDateStr, 'totalDelta').reduce((a,b)=>a+(b||0),0);
             
             const fixedBestDate = "2026-11-04";
@@ -338,9 +335,22 @@
                     }
                 },
                 legend: { top: '0%', itemWidth: 12, itemHeight: 8, textStyle: { fontSize: 12 }, type: 'scroll' },
-                grid: { left: '50px', right: '50px', bottom: '10%', top: '15%' },
+                // 【修改点1】：增加左侧留白宽度，防止数字被截断
+                grid: { left: '70px', right: '40px', bottom: '10%', top: '15%' },
                 xAxis: { type: 'category', boundaryGap: false, data: xAxisHours, axisLabel: { interval: 3, fontSize: 10 } },
-                yAxis: { type: 'value', name: title, scale: true, axisLabel: { fontSize: 11 } },
+                // 【修改点2】：纵轴数值改成以 w（万）为单位的缩写
+                yAxis: { 
+                    type: 'value', 
+                    name: title, 
+                    scale: true, 
+                    axisLabel: { 
+                        fontSize: 11,
+                        formatter: function(v) {
+                            if (v >= 10000) return (v / 10000) + 'w';
+                            return v;
+                        }
+                    } 
+                },
                 series: series
             });
 
