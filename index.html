@@ -34,7 +34,13 @@
         
         .card { background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 12px; padding: 12px 0; overflow: hidden; }
         .chart-wrapper { width: 100%; height: 380px; }
-        .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 5px 0; }
+        .title { text-align: center; color: #D35400; font-size: 15px; font-weight: bold; margin: 5px 0 10px 0; display: flex; justify-content: center; align-items: center; gap: 10px;}
+        
+        /* 日期选择器 */
+        .date-select {
+            font-size: 14px; font-weight: bold; color: #D35400; background-color: #FDF2E9;
+            border: 1px solid #FFB27A; border-radius: 8px; padding: 4px 8px; outline: none;
+        }
         
         /* 胶囊对比标签 */
         .diff-badge {
@@ -121,7 +127,10 @@
             </div>
 
             <div class="card">
-                <div class="title">总电力值增幅趋势</div>
+                <div class="title">
+                    总电力值增幅趋势
+                    <select id="dateSelector" class="date-select"></select>
+                </div>
                 <div class="diff-badge" id="compareBadge">计算中...</div>
                 <div class="chart-wrapper" id="chartNewTotalDelta"></div>
             </div>
@@ -149,6 +158,7 @@
         let globalAllRows = [];
         let allDates = [];
         let todayTotalDeltaGlobal = 0; 
+        let selectedChartDate = ""; // 当前选中查看的图表日期
 
         const charts = {
             newTotalDelta: echarts.init(document.getElementById('chartNewTotalDelta')),
@@ -201,13 +211,13 @@
             return arr;
         }
 
-        // 获取今天最后有数据的小时
-        function getLastHourToday() {
-            if (globalAllRows.length === 0) return 0;
-            const latestRow = globalAllRows[globalAllRows.length - 1];
-            const timeParts = latestRow.rawTime.split(' ')[1].split(':');
-            let hour = parseInt(timeParts[0], 10);
-            return hour >= 24 ? 23 : hour;
+        // 获取某一天的最后有数据的小时（用于截取同时段）
+        function getLastHourOfDate(dateStr) {
+            if (!globalDataMap[dateStr]) return 0;
+            const hours = Object.keys(globalDataMap[dateStr]).map(h => parseInt(h.split(':')[0]));
+            if (hours.length === 0) return 0;
+            let maxH = Math.max(...hours);
+            return maxH >= 24 ? 23 : maxH;
         }
 
         function updateHoverData() {
@@ -227,25 +237,39 @@
             } else {
                 document.getElementById('hoverRemainDiff').innerHTML = `(已达标)`;
             }
-
-            document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotalDeltaGlobal);
         }
 
-        // 【核心修复】：计算胶囊对比标签
+        // 更新胶囊对比标签
         function updateCompareBadge() {
-            if (allDates.length === 0) return;
-            const todayStr = allDates[0];
-            const prevDateStr = new Date(new Date(todayStr).getTime() - 86400000).toISOString().split('T')[0];
+            const todayStr = allDates[0]; // 数据里最新的一天
             
-            if (!globalDataMap[prevDateStr]) {
-                document.getElementById('compareBadge').innerHTML = `暂无昨天的数据进行对比`;
+            if (!selectedChartDate) {
+                document.getElementById('compareBadge').innerHTML = `暂无数据`;
                 return;
             }
 
-            const lastHour = getLastHourToday();
-            let prevDeltaAtCur = 0;
+            // 如果选中的是今天，胶囊显示今天的总增幅
+            if (selectedChartDate === todayStr) {
+                document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotalDeltaGlobal);
+            } else {
+                // 如果选中的是历史，计算选中那天的总增幅并显示在顶部
+                const selTotal = getSeriesData(selectedChartDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
+                document.getElementById('hoverTodayTotal').innerText = formatNum(selTotal) + ` (${selectedChartDate.substring(5)})`;
+            }
+
+            const prevDateStr = new Date(new Date(selectedChartDate).getTime() - 86400000).toISOString().split('T')[0];
             
-            // 昨天同时段，也必须从 01:00 开始算（跳过 0 点），避免昨天跨天的巨大增幅干扰
+            if (!globalDataMap[prevDateStr]) {
+                document.getElementById('compareBadge').innerHTML = `暂无前一天的数据进行对比`;
+                return;
+            }
+
+            // 获取选中日期的最后时间点，截取对比
+            const lastHour = getLastHourOfDate(selectedChartDate);
+            const selTotalDelta = getSeriesData(selectedChartDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
+            
+            let prevDeltaAtCur = 0;
+            // 同步段对比，必须从 01:00 开始（跳过 0 点跨天）
             for(let i=1; i <= lastHour; i++) {
                 let hStr = (i < 10 ? '0'+i : i) + ':00';
                 if (globalDataMap[prevDateStr][hStr] && globalDataMap[prevDateStr][hStr].totalDelta) {
@@ -253,13 +277,13 @@
                 }
             }
 
-            const diff = todayTotalDeltaGlobal - prevDeltaAtCur;
+            const diff = selTotalDelta - prevDeltaAtCur;
             let badgeEl = document.getElementById('compareBadge');
 
             if (diff >= 0) {
-                badgeEl.innerHTML = `截至当前，今天比昨天同时段<br><span style="color:#e74c3c; font-size:14px;">领先 ${formatNum(diff)}</span>`;
+                badgeEl.innerHTML = `截至当前，${selectedChartDate.substring(5)} 比前一天同时段<br><span style="color:#e74c3c; font-size:14px;">领先 ${formatNum(diff)}</span>`;
             } else {
-                badgeEl.innerHTML = `截至当前，今天比昨天同时段<br><span style="color:#27ae60; font-size:14px;">落后 ${formatNum(Math.abs(diff))}</span>`;
+                badgeEl.innerHTML = `截至当前，${selectedChartDate.substring(5)} 比前一天同时段<br><span style="color:#27ae60; font-size:14px;">落后 ${formatNum(Math.abs(diff))}</span>`;
             }
         }
 
@@ -304,8 +328,25 @@
                     
                     renderLiveTable(globalAllRows.slice(-10).reverse());
                     updateHoverData();
-                    updateCompareBadge(); // 更新对比
-                    renderNewTab(allDates[0]);
+                    
+                    // 初始化日期选择器
+                    const selector = document.getElementById('dateSelector');
+                    allDates.forEach(date => {
+                        const opt = document.createElement('option');
+                        opt.value = date; opt.innerText = date; selector.appendChild(opt);
+                    });
+                    
+                    selectedChartDate = allDates[0]; // 默认选中最新一天
+                    selector.value = selectedChartDate;
+                    
+                    selector.addEventListener('change', (e) => { 
+                        selectedChartDate = e.target.value;
+                        updateCompareBadge();
+                        renderNewTab(selectedChartDate); 
+                    });
+                    
+                    updateCompareBadge();
+                    renderNewTab(selectedChartDate);
                     renderHistoryTab();
                 }
             });
@@ -330,10 +371,10 @@
             });
         }
 
-        function renderNewTab(selectedDate) {
-            const prevDateStr = new Date(new Date(selectedDate).getTime() - 86400000).toISOString().split('T')[0];
+        function renderNewTab(targetDate) {
+            const prevDateStr = new Date(new Date(targetDate).getTime() - 86400000).toISOString().split('T')[0];
             
-            const totalDeltaToday = todayTotalDeltaGlobal; 
+            const totalDeltaTarget = getSeriesData(targetDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
             const totalDeltaPrev = getSeriesData(prevDateStr, 'totalDelta').reduce((a,b)=>a+(b||0),0);
             
             const fixedBestDate = "2026-11-04";
@@ -374,9 +415,11 @@
             });
 
             let seriesTD = [];
-            if (globalDataMap[selectedDate]) seriesTD.push({ name: `${selectedDate.substring(5)} (总计: ${formatNum(totalDeltaToday)})`, type: 'line', data: getSeriesData(selectedDate, 'totalDelta'), itemStyle: { color: '#FF8C42' }, lineStyle: { width: 2.5 } });
+            if (globalDataMap[targetDate]) seriesTD.push({ name: `${targetDate.substring(5)} (总计: ${formatNum(totalDeltaTarget)})`, type: 'line', data: getSeriesData(targetDate, 'totalDelta'), itemStyle: { color: '#FF8C42' }, lineStyle: { width: 2.5 } });
             if (globalDataMap[prevDateStr]) seriesTD.push({ name: `${prevDateStr.substring(5)} (总计: ${formatNum(totalDeltaPrev)})`, type: 'line', data: getSeriesData(prevDateStr, 'totalDelta'), itemStyle: { color: '#FFB3C6' }, lineStyle: { width: 2 } });
-            if (globalDataMap[fixedBestDate]) seriesTD.push({ name: `${fixedBestDate.substring(5)} (最佳: ${formatNum(bestTotalDelta)})`, type: 'line', data: getSeriesData(fixedBestDate, 'totalDelta'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
+            if (globalDataMap[fixedBestDate] && targetDate !== fixedBestDate && prevDateStr !== fixedBestDate) {
+                seriesTD.push({ name: `${fixedBestDate.substring(5)} (最佳: ${formatNum(bestTotalDelta)})`, type: 'line', data: getSeriesData(fixedBestDate, 'totalDelta'), itemStyle: { color: '#FFDAB9' }, lineStyle: { width: 1.5, type: [4, 2] } });
+            }
             
             charts.newTotalDelta.setOption(getOption(seriesTD, '总电增幅'), true);
         }
