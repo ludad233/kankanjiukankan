@@ -2,24 +2,14 @@ import asyncio
 import csv
 import os
 import re
-import shutil
 from datetime import datetime, timedelta
 from playwright.async_api import async_playwright
-
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
 # ============ 配置 ============
 URL_POWER = "https://y.qq.com/tmead/promotion/h5/powering/1793152992875?_hidehd=1&_miniplayer=1&adtag=share_task&singerId=6665073&p_share=w2pZEizuC5V-xTHRIivoTwD_5f_DMRfGNgTtS7isP_4&hosteuin=oiEqow6FoiCA7n**&ADTAG=wxfshare"
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, "power_data.csv")
-CHART_FILE = os.path.join(BASE_DIR, "comparison_chart.png")
-HISTORY_DIR = os.path.join(BASE_DIR, "history")
-os.makedirs(HISTORY_DIR, exist_ok=True)
 
 
 # ============ 抓取与存储 ============
@@ -81,18 +71,6 @@ def load_all_rows():
         except:
             continue
     return [], []
-
-
-def parse_dt_loose(s):
-    if not s: return None
-    s = re.sub(r'(\d+[/-]\d+[/-]\d+)\s+(\d{1}):', r'\1 0\2:', s)
-    s = s.strip().replace("/", "-")
-    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
-        try:
-            return datetime.strptime(s, fmt)
-        except:
-            pass
-    return None
 
 
 def get_prev_hour_record(curr_dt, all_rows):
@@ -158,83 +136,6 @@ def append_csv(row_dict):
     print(f"✅ [{formatted_time}] 写入完成。\n")
 
 
-# ============ 图表生成 ============
-def to_float(v):
-    try:
-        return float(v) if v not in (None, "") else None
-    except:
-        return None
-
-
-def generate_chart(target_date, save_path):
-    header, rows = load_all_rows()
-    if not rows: return
-
-    data_map = {}
-    for r in rows:
-        if len(r) < 9: continue
-        dt = parse_dt_loose(r[0])
-        if dt is None: continue
-        target_date_str = dt.strftime('%Y-%m-%d')
-        rec = {"dt": dt, "hour": dt.hour, "minute": dt.minute,
-               "heart": to_float(r[1]), "heart_delta": to_float(r[2]),
-               "team1": to_float(r[3]), "delta": to_float(r[4]),
-               "totalPower": to_float(r[5]) if len(r) > 5 else None,
-               "total_delta": to_float(r[6]) if len(r) > 6 else None,
-               "people": to_float(r[7]) if len(r) > 7 else None,
-               "people_delta": to_float(r[8]) if len(r) > 8 else None}
-        if dt.hour == 0:
-            data_map[f"{target_date_str}_0"] = rec
-            continue
-        data_map.setdefault(f"{target_date_str}_{dt.hour}", rec)
-
-    today_str = target_date.strftime("%Y-%m-%d")
-    yest_str = (target_date - timedelta(days=1)).strftime("%Y-%m-%d")
-    next_str = (target_date + timedelta(days=1)).strftime("%Y-%m-%d")
-    hours = list(range(0, 25))
-
-    plt.rcParams["font.sans-serif"] = ["WenQuanYi Zen Hei", "Microsoft YaHei", "SimHei", "Arial Unicode MS",
-                                       "DejaVu Sans"]
-    plt.rcParams["axes.unicode_minus"] = False
-
-    fig, axes = plt.subplots(4, 1, figsize=(14, 18), sharex=True)
-    fig.suptitle(f"今天({target_date}) 数据总览", fontsize=20, fontweight="bold", color="#D35400", y=0.96)
-
-    def plot_metric(ax, key, title, color):
-        yest_vals, today_vals = [], []
-        for h in hours:
-            if h == 0:
-                y_data, t_data = data_map.get(f"{yest_str}_0"), data_map.get(f"{today_str}_0")
-            elif h == 24:
-                y_data, t_data = data_map.get(f"{today_str}_0"), data_map.get(f"{next_str}_0")
-            else:
-                y_data, t_data = data_map.get(f"{yest_str}_{h}"), data_map.get(f"{today_str}_{h}")
-
-            yest_vals.append(y_data[key] if y_data and y_data[key] is not None else float("nan"))
-            today_vals.append(t_data[key] if t_data and t_data[key] is not None else float("nan"))
-
-        ax.plot(hours, yest_vals, marker="o", linestyle="-", color="#FFB3C6", linewidth=2, markersize=5, label="昨天")
-        ax.plot(hours, today_vals, marker="o", linestyle="-", color=color, linewidth=2.5, markersize=5, label="今天")
-        ax.set_title(title, fontsize=14, fontweight="bold", color="#333")
-        ax.grid(axis='y', linestyle="--", alpha=0.3)
-
-        for h, val in zip(hours, today_vals):
-            if val is not None and not (isinstance(val, float) and val != val) and val != 0:
-                ax.annotate(f'{int(val):,}', (h, val), textcoords="offset points", xytext=(0, -15), ha='center',
-                            fontsize=7, color="#D35400")
-
-    plot_metric(axes[0], 'heart', '心动人数趋势', '#FF8C42')
-    plot_metric(axes[1], 'team1', '团建电力趋势', '#FF8C42')
-    plot_metric(axes[2], 'totalPower', '总电力值趋势', '#333333')
-    plot_metric(axes[3], 'people', '发电总人数趋势', '#D81B60')
-
-    axes[-1].xaxis.set_major_locator(ticker.MultipleLocator(2))
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
-    fig.savefig(save_path, dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"图表已生成：{save_path}")
-
-
 async def run_once():
     now_bj = datetime.now() + timedelta(hours=8)
 
@@ -257,15 +158,6 @@ async def run_once():
         return
 
     append_csv(data)
-
-    try:
-        chart_date = now_bj
-        if chart_date.minute >= 50:
-            chart_date = chart_date + timedelta(minutes=(60 - chart_date.minute))
-        today_date = chart_date.date()
-        generate_chart(today_date, CHART_FILE)
-    except Exception as e:
-        print(f"生成图表失败: {e}")
 
 
 if __name__ == "__main__":
