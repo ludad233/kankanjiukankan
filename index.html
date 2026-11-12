@@ -15,17 +15,18 @@
         /* 固定显示的数据面板 */
         .hover-box { 
             background: rgba(255, 255, 255, 0.98); border: 1px solid #FFB27A; border-radius: 12px; 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08); padding: 15px; width: 100%; max-width: 350px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); padding: 20px 15px; width: 100%; max-width: 350px; 
             margin: 0 auto 15px auto; text-align: left; box-sizing: border-box;
         }
         
-        .top-total { font-size: 18px; font-weight: bold; color: #FF69B4; text-align: center; margin-bottom: 5px; }
-        .hover-title { font-size: 18px; font-weight: bold; color: #D35400; margin-bottom: 12px; text-align: center; border-bottom: 1px solid #eee; padding-bottom: 10px; }
-        .hover-row { font-size: 13px; color: #555; display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-        .hover-row:last-child { margin-bottom: 0; }
-        .hover-val { font-weight: bold; color: #333; text-align: right; line-height: 1.2; }
-        .hover-sub { font-size: 11px; color: #888; font-weight: normal; margin-top: 2px; display: block; }
-        .text-red { color: #e74c3c; font-weight: bold; }
+        /* 大字样式 */
+        .top-total { 
+            font-size: 20px; font-weight: bold; color: #FF69B4; text-align: center; margin-bottom: 15px; 
+        }
+        
+        .hover-title { 
+            font-size: 20px; font-weight: bold; color: #D35400; text-align: center; margin-bottom: 0; 
+        }
 
         /* Tab 样式 */
         .tabs { display: flex; justify-content: center; margin-bottom: 12px; background: white; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 10px; gap: 10px; }
@@ -83,22 +84,15 @@
         
         <div class="page-header">电力值数据追踪</div>
         
+        <!-- 精简后的面板 -->
         <div class="hover-box" id="goalHoverBox">
             <div class="top-total">
                 发电总值：<span id="hoverLatestTotal">计算中...</span>
             </div>
             
-            <div class="hover-title">总目标增幅 2.2亿</div>
-            
-            <div class="hover-row">
-                <span>目前发电增幅：</span>
-                <div class="hover-val">
-                    <span id="hoverCurrentIncrease">计算中...</span>
-                    <span class="hover-sub" id="hoverRemainDiff"></span>
-                </div>
+            <div class="hover-title">
+                今日总增幅：<span id="hoverTodayTotal">计算中...</span>
             </div>
-            <div class="hover-row"><span>初始总电力：</span><span class="hover-val">763,797,264</span></div>
-            <div class="hover-row"><span>今日发电总值：</span><span class="hover-val" id="hoverTodayTotal">计算中...</span></div>
         </div>
 
         <div class="tabs">
@@ -152,13 +146,12 @@
     <script>
         const CACHE_BUSTER = 'v=' + new Date().getTime();
         const INITIAL_TOTAL_POWER = 763797264; 
-        const TARGET_INCREASE = 220000000; 
 
         let globalDataMap = {}; 
         let globalAllRows = [];
         let allDates = [];
         let todayTotalDeltaGlobal = 0; 
-        let selectedChartDate = ""; // 当前选中查看的图表日期
+        let selectedChartDate = ""; 
 
         const charts = {
             newTotalDelta: echarts.init(document.getElementById('chartNewTotalDelta')),
@@ -211,7 +204,6 @@
             return arr;
         }
 
-        // 获取某一天的最后有数据的小时（用于截取同时段）
         function getLastHourOfDate(dateStr) {
             if (!globalDataMap[dateStr]) return 0;
             const hours = Object.keys(globalDataMap[dateStr]).map(h => parseInt(h.split(':')[0]));
@@ -228,33 +220,19 @@
 
             document.getElementById('hoverLatestTotal').innerText = formatNum(latestTotal);
 
-            const currentIncrease = latestTotal - INITIAL_TOTAL_POWER;
-            document.getElementById('hoverCurrentIncrease').innerText = formatNum(currentIncrease);
-
-            if (currentIncrease < TARGET_INCREASE) {
-                const remain = TARGET_INCREASE - currentIncrease;
-                document.getElementById('hoverRemainDiff').innerHTML = `(距2.2亿还差 <span class="text-red">${formatNum(remain)}</span>)`;
+            if (selectedChartDate === allDates[0]) {
+                document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotalDeltaGlobal);
             } else {
-                document.getElementById('hoverRemainDiff').innerHTML = `(已达标)`;
+                const selTotal = getSeriesData(selectedChartDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
+                document.getElementById('hoverTodayTotal').innerText = formatNum(selTotal);
             }
         }
 
-        // 更新胶囊对比标签
         function updateCompareBadge() {
-            const todayStr = allDates[0]; // 数据里最新的一天
-            
+            const todayStr = allDates[0];
             if (!selectedChartDate) {
                 document.getElementById('compareBadge').innerHTML = `暂无数据`;
                 return;
-            }
-
-            // 如果选中的是今天，胶囊显示今天的总增幅
-            if (selectedChartDate === todayStr) {
-                document.getElementById('hoverTodayTotal').innerText = formatNum(todayTotalDeltaGlobal);
-            } else {
-                // 如果选中的是历史，计算选中那天的总增幅并显示在顶部
-                const selTotal = getSeriesData(selectedChartDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
-                document.getElementById('hoverTodayTotal').innerText = formatNum(selTotal) + ` (${selectedChartDate.substring(5)})`;
             }
 
             const prevDateStr = new Date(new Date(selectedChartDate).getTime() - 86400000).toISOString().split('T')[0];
@@ -264,12 +242,10 @@
                 return;
             }
 
-            // 获取选中日期的最后时间点，截取对比
             const lastHour = getLastHourOfDate(selectedChartDate);
             const selTotalDelta = getSeriesData(selectedChartDate, 'totalDelta').reduce((a,b)=>a+(b||0),0);
             
             let prevDeltaAtCur = 0;
-            // 同步段对比，必须从 01:00 开始（跳过 0 点跨天）
             for(let i=1; i <= lastHour; i++) {
                 let hStr = (i < 10 ? '0'+i : i) + ':00';
                 if (globalDataMap[prevDateStr][hStr] && globalDataMap[prevDateStr][hStr].totalDelta) {
@@ -327,25 +303,25 @@
                     todayTotalDeltaGlobal = getSeriesData(allDates[0], 'totalDelta').reduce((a,b)=>a+(b||0),0);
                     
                     renderLiveTable(globalAllRows.slice(-10).reverse());
-                    updateHoverData();
                     
-                    // 初始化日期选择器
                     const selector = document.getElementById('dateSelector');
                     allDates.forEach(date => {
                         const opt = document.createElement('option');
                         opt.value = date; opt.innerText = date; selector.appendChild(opt);
                     });
                     
-                    selectedChartDate = allDates[0]; // 默认选中最新一天
+                    selectedChartDate = allDates[0];
                     selector.value = selectedChartDate;
                     
                     selector.addEventListener('change', (e) => { 
                         selectedChartDate = e.target.value;
                         updateCompareBadge();
+                        updateHoverData();
                         renderNewTab(selectedChartDate); 
                     });
                     
                     updateCompareBadge();
+                    updateHoverData();
                     renderNewTab(selectedChartDate);
                     renderHistoryTab();
                 }
